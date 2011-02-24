@@ -537,7 +537,11 @@ void gamePlay(float elapse, unsigned* stage)
 				p->iy = gp->path[p->path].y;
 			}
 			else
+			{
+				p->ix = p->x - m->dx;
+				p->iy = p->y - m->dy;
 				p->move = 1;
+			}
 		}
 		else if (p->move)
 		{
