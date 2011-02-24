@@ -432,6 +432,9 @@ void gamePlay(float elapse, unsigned* stage)
 	if (keyDown('r'))
 		--(*stage);
 
+	if (p->path >= 0 || p->move)
+		goto ignore_mouse_input;
+
 	const int mx = unposX(g_mousex, ss);
 	const int my = unposY(g_mousey, ss);
 
@@ -529,6 +532,9 @@ void gamePlay(float elapse, unsigned* stage)
 			}
 		}
 	}
+
+ignore_mouse_input:
+	;
 
 	const float tt = .1f;
 
