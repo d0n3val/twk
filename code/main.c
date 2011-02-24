@@ -287,11 +287,11 @@ void gameStart(float elapse, unsigned* stage)
 
 struct PathNode
 {
-	unsigned x : 16;
-	unsigned y : 16;
-	unsigned h : 8;
-	unsigned g : 6;
-	unsigned p : 2;
+	int x : 16;
+	int y : 16;
+	int h : 8;
+	int g : 6;
+	int p : 2;
 };
 
 struct Player
@@ -353,7 +353,7 @@ int pathFind(int startx, int starty, int goalx, int goaly)
 				int y = cur->y + ((1 | cur->p << 31 >> 31) & (cur->p << 30 >> 31));
 
 				for (j = 0; nodes[j].x != x || nodes[j].y != y; ++j)
-					;
+					assert(j < nnodes);
 
 				cur = &nodes[j];
 			}
