@@ -502,20 +502,30 @@ void gamePlay(float elapse, unsigned* stage)
 
 		if (m->dx || m->dy)
 		{
-			pathFind(p->x, p->y, m->x0 + m->dx, m->y0 + m->dy);
-
-			p->time = 0.f;
-			p->move = 0;
-
-			if ((p->path = gp->npath - 1) >= 0)
+			if (p->x != m->x0 + m->dx || p->y != m->y0 + m->dy)
 			{
-				p->ix = gp->path[p->path].x;
-				p->iy = gp->path[p->path].y;
+				pathFind(p->x, p->y, m->x0 + m->dx, m->y0 + m->dy);
+
+				p->time = 0.f;
+				p->move = 0;
+
+				if ((p->path = gp->npath - 1) >= 0)
+				{
+					p->ix = gp->path[p->path].x;
+					p->iy = gp->path[p->path].y;
+				}
+				else
+				{
+					m->x0 = -1;
+					m->y0 = -1;
+				}
 			}
 			else
 			{
-				m->x0 = -1;
-				m->y0 = -1;
+				p->ix = p->x - m->dx;
+				p->iy = p->y - m->dy;
+				p->time = 0.f;
+				p->move = 1;
 			}
 		}
 	}
