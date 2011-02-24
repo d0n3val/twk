@@ -150,13 +150,44 @@ char* g_textEnd;
 const char* g_texnames[] = {"crate", "player"};
 unsigned g_tex[NUM_TEX];
 
-struct Map
+#define TILE_VOID ('!')
+#define TILE_WALL ('X')
+#define TILE_FLOOR ('.')
+#define TILE_START ('$')
+#define TILE_CRATE ('#')
+#define TILE_TARGET ('*')
+#define TILE_UNKNOWN ('?')
+
+struct Crate
 {
-	int width, height;
-	char data[0];
+	int x, y;
 };
 
-struct Map* g_map;
+struct World
+{
+	int ncrates;
+	struct Crate crates[64];
+
+	int startx, starty;
+	int nx, ny;
+	char tiles[4096];
+};
+
+struct World g_world;
+
+int worldTile(int x, int y)
+{
+	return x >= 0 && y >= 0 ? g_world.tiles[y * g_world.nx + x] : TILE_UNKNOWN;
+}
+
+struct Crate* worldCrate(int x, int y)
+{
+	for (int i = 0; i < g_world.ncrates; ++i)
+		if (g_world.crates[i].x == x && g_world.crates[i].y == y)
+			return &g_world.crates[i];
+
+	return NULL;
+}
 
 void gprintf(float x, float y, unsigned c, const char* fmt, ...);
 void quad(float x, float y, float s, unsigned c);
@@ -263,21 +294,43 @@ struct PathNode
 	unsigned p : 2;
 };
 
+struct Player
+{
+	float time;
+	int x, y;
+	int ix, iy;
+	int path;
+	int move;
+};
+
+struct Move
+{
+	int x0, y0;
+	int x1, y1;
+	int dx, dy;
+	int ci;
+};
+
 struct GamePlay
 {
 	int init;
-	int px, py, pp;
-	float ptime;
+	struct Player player;
+	struct Move move;
 	int npath;
 	struct PathNode path[128];
 } g_gamePlay;
 
 int pathFind(int startx, int starty, int goalx, int goaly)
 {
+	static struct PathNode nodes[2048];
+	static struct PathNode* open[256];
+	static struct PathNode* closed[2048];
+
 	struct GamePlay* gp = &g_gamePlay;
-	struct PathNode nodes[64] = {{startx, starty, 0, 0, 0}};
-	struct PathNode* open[16] = {&nodes[0]};
-	struct PathNode* closed[64] = {NULL};
+	const struct PathNode start = {startx, starty, 0, 0, 0};
+
+	nodes[0] = start;
+	open[0] = &nodes[0];
 
 	for (int nnodes = 1, nopen = 1, nclosed = 0; nopen > 0;)
 	{
@@ -291,17 +344,13 @@ int pathFind(int startx, int starty, int goalx, int goaly)
 
 		if (cur->x == goalx && cur->y == goaly)
 		{
-			for (gp->npath = 0;;)
+			for (gp->npath = 0; cur->x != startx || cur->y != starty;)
 			{
 				assert((size_t) gp->npath < arrayCount(gp->path));
 				gp->path[gp->npath++] = *cur;
 
-				if (cur->x == startx && cur->y == starty)
-					break;
-
-				int p = cur->p;
-				int x = cur->x + ((1 | p << 31 >> 31) & ~(p << 30 >> 31));
-				int y = cur->y + ((1 | p << 31 >> 31) & (p << 30 >> 31));
+				int x = cur->x + ((1 | cur->p << 31 >> 31) & ~(cur->p << 30 >> 31));
+				int y = cur->y + ((1 | cur->p << 31 >> 31) & (cur->p << 30 >> 31));
 
 				for (j = 0; nodes[j].x != x || nodes[j].y != y; ++j)
 					;
@@ -321,7 +370,7 @@ int pathFind(int startx, int starty, int goalx, int goaly)
 			int x = cur->x + ((1 | i << 31 >> 31) & ~(i << 30 >> 31));
 			int y = cur->y + ((1 | i << 31 >> 31) & (i << 30 >> 31));
 
-			if (x < 0 || x >= g_map->width || y < 0 || y >= g_map->height)
+			if (x < 0 || x >= g_world.nx || y < 0 || y >= g_world.ny)
 				continue;
 
 			for (j = 0; j < nclosed; ++j)
@@ -331,9 +380,7 @@ int pathFind(int startx, int starty, int goalx, int goaly)
 			if (j < nclosed)
 				continue;
 
-			char chr = g_map->data[y * g_map->width + x];
-
-			if (chr == '!' || chr == 'X')
+			if (worldTile(x, y) == TILE_WALL || worldCrate(x, y))
 				continue;
 
 			for (j = 0; j < nopen; ++j)
@@ -362,67 +409,219 @@ int pathFind(int startx, int starty, int goalx, int goaly)
 	return -1;
 }
 
+float posX(int x, int s) { return g_width * .5f - s * (g_world.nx * .5f) + x * s; }
+float posY(int y, int s) { return g_height * .5f - s * (g_world.ny * .5f) + y * s; }
+int unposX(float x, int s) { return (x + s *.5f - (g_width * .5f - s * (g_world.nx * .5f))) / s; }
+int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world.ny * .5f))) / s; }
+
 void gamePlay(float elapse, unsigned* stage)
 {
 	struct GamePlay* gp = &g_gamePlay;
+	struct Player* p = &gp->player;
+	struct Move* m = &gp->move;
 	float ss = 32.f;
-
-	(void) stage;
 
 	if (!gp->init)
 	{
 		gp->init = 1;
-		gp->px = 1;
-		gp->py = 2;
-		gp->pp = -1;
+		p->ix = p->x = g_world.startx;
+		p->iy = p->y = g_world.starty;
+		p->path = -1;
 	}
 
-	if ((gp->ptime += elapse) >= .15f)
-	{
-		gp->ptime -= .15f;
+	if (keyDown('r'))
+		--(*stage);
 
-		if (gp->pp >= 0)
+	const int mx = unposX(g_mousex, ss);
+	const int my = unposY(g_mousey, ss);
+
+	if (buttonDown(0))
+	{
+		struct Crate* crate = worldCrate(mx, my);
+
+		m->x0 = -1;
+		m->y0 = -1;
+
+		if (crate != NULL)
 		{
-			gp->px = gp->path[gp->pp].x;
-			gp->py = gp->path[gp->pp].y;
-			--gp->pp;
+			m->x0 = mx;
+			m->y0 = my;
+			m->ci = crate - g_world.crates;
+		}
+	}
+
+	if (buttonHeld(0))
+	{
+		m->x1 = -1;
+		m->y1 = -1;
+
+		if (mx != m->x0 && my == m->y0)
+		{
+			int i = min(mx, m->x0 + 1);
+			int n = max(mx, m->x0 - 1);
+
+			for (; i < n + 1; ++i)
+				if ((worldTile(i, my) != TILE_FLOOR && worldTile(i, my) != TILE_TARGET) || worldCrate(i, my))
+					break;
+
+			if (i > n)
+			{
+				m->x1 = mx;
+				m->y1 = my;
+			}
+		}
+		else if (mx == m->x0 && my != m->y0)
+		{
+			int i = min(my, m->y0 + 1);
+			int n = max(my, m->y0 - 1);
+
+			for (; i < n + 1; ++i)
+				if ((worldTile(mx, i) != TILE_FLOOR && worldTile(mx, i) != TILE_TARGET) || worldCrate(mx, i))
+					break;
+
+			if (i > n)
+			{
+				m->x1 = mx;
+				m->y1 = my;
+			}
+		}
+	}
+
+	if (buttonUp(0))
+	{
+		m->dx = 0;
+		m->dy = 0;
+
+		if (m->x0 >= 0)
+		{
+			if (m->x0 == m->x1)
+				m->dy = 1 | (m->y0 - m->y1) >> 31;
+			else if (m->y0 == m->y1)
+				m->dx = 1 | (m->x0 - m->x1) >> 31;
+		}
+
+		if (m->dx || m->dy)
+		{
+			pathFind(p->x, p->y, m->x0 + m->dx, m->y0 + m->dy);
+
+			p->time = 0.f;
+			p->move = 0;
+
+			if ((p->path = gp->npath - 1) >= 0)
+			{
+				p->ix = gp->path[p->path].x;
+				p->iy = gp->path[p->path].y;
+			}
+			else
+			{
+				m->x0 = -1;
+				m->y0 = -1;
+			}
+		}
+	}
+
+	const float tt = .1f;
+
+	if ((p->time += elapse) >= tt)
+	{
+		p->time -= tt;
+
+		if (p->path >= 0)
+		{
+			p->x = gp->path[p->path].x;
+			p->y = gp->path[p->path].y;
+
+			if (--p->path >= 0)
+			{
+				p->ix = gp->path[p->path].x;
+				p->iy = gp->path[p->path].y;
+			}
+			else
+				p->move = 1;
+		}
+		else if (p->move)
+		{
+			m->x0 -= m->dx;
+			m->y0 -= m->dy;
+
+			g_world.crates[m->ci].x -= m->dx;
+			g_world.crates[m->ci].y -= m->dy;
+
+			p->ix = (p->x -= m->dx) - m->dx;
+			p->iy = (p->y -= m->dy) - m->dy;
+
+			if (m->x0 == m->x1 && m->y0 == m->y1)
+			{
+				p->ix = p->x;
+				p->iy = p->y;
+				p->move = 0;
+
+				m->x0 = -1;
+				m->y0 = -1;
+				m->x1 = -1;
+				m->y1 = -1;
+				m->dx = 0;
+				m->dy = 0;
+			}
 		}
 	}
 
 	srand(15);
 
-	for (int y = 0; y < g_map->height; ++y)
+	for (int y = 0; y < g_world.ny; ++y)
 	{
-		for (int x = 0; x < g_map->width; ++x)
+		for (int x = 0; x < g_world.nx; ++x)
 		{
-			char tt = g_map->data[y * g_map->width + x];
+			const int tile = worldTile(x, y);
+			unsigned cc = (unsigned) (0x20 * ((float) rand() / RAND_MAX));
+			unsigned kk = 0x008f6f6f;
 
-			if (tt == '!')
+			if (tile == TILE_WALL)
+				kk = 0x002f3f4f;
+			else if (tile == TILE_TARGET)
+				kk = 0x007fcf7f;
+			else if (tile == TILE_VOID)
 				continue;
 
-			float xx = g_width / 2.f - ss * (g_map->width / 2.f) + x * ss;
-			float yy = g_height / 2.f - ss * (g_map->height / 2.f) + y * ss;
-			unsigned cc = (unsigned) (0x20 * ((float) rand() / RAND_MAX));
-			unsigned kk = tt == 'X' ? 0x002f3f4f : 0x008f6f6f;
-
-			if (xx - ss * .5f <= g_mousex && xx + ss * .5f > g_mousex)
-				if (yy - ss * .5f <= g_mousey && yy + ss * .5f > g_mousey)
-					if (buttonDown(0))
-					{
-						pathFind(gp->px, gp->py, x, y);
-						gp->pp = gp->npath - 1;
-					}
-
-			for (int i = 0; i < g_gamePlay.npath; ++i)
-				if (gp->path[i].x == x && gp->path[i].y == y)
-					cc = 0x000f1f0f;
-
-			quad(xx, yy, ss, kk + cc);
-
-			if (gp->px == x && gp->py == y)
-				sprite(xx, yy, ss, TEX_PLAYER);
+			quad(posX(x, ss), posY(y, ss), ss, kk + cc);
 		}
 	}
+
+	const float ix = (p->ix - p->x) * ss * (p->time / tt);
+	const float iy = (p->iy - p->y) * ss * (p->time / tt);
+
+	for (int i = 0; i < g_world.ncrates; ++i)
+	{
+		const int x = g_world.crates[i].x;
+		const int y = g_world.crates[i].y;
+		float xx = posX(x, ss);
+		float yy = posY(y, ss);
+
+		if (p->move && p->x - m->dx == x && p->y - m->dy == y)
+		{
+			xx += ix;
+			yy += iy;
+		}
+
+		quad(xx, yy, ss, 0x0000bfbf);
+	}
+
+	if (buttonHeld(0))
+	{
+		const int x0 = min(m->x0 + 1, m->x1), x1 = max(m->x0 - 1, m->x1);
+		const int y0 = min(m->y0 + 1, m->y1), y1 = max(m->y0 - 1, m->y1);
+
+		if ((x0 == x1 && y0 != y1) || (x0 != y1 && y0 == y1))
+		{
+			for (int i = x0; i <= x1 && worldTile(x0, y0) == TILE_FLOOR; ++i)
+				quad(posX(i, ss), posY(y0, ss), ss, 0x007fcf3f);
+
+			for (int i = y0; i <= y1 && worldTile(x0, y0) == TILE_FLOOR; ++i)
+				quad(posX(x0, ss), posY(i, ss), ss, 0x007fcf3f);
+		}
+	}
+
+	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -611,7 +810,7 @@ void onDisplay()
 	elapse = (1.f / 3.f) * elapse + (1.f - 1.f / 3.f) * g_elapse;
 	g_elapse = elapse;
 
-	gprintf(.9f, .05f, 0x00ffffff, "FPS %.02f", 1.f / elapse);
+	gprintf(.9f, .05f, 0x00cf7f7f, "FPS %.02f", 1.f / elapse);
 
 	// render game
 
@@ -624,6 +823,8 @@ void onDisplay()
 
 	glClearColor(.1f, .1f, .3f, 0.f);
 	glClear(GL_COLOR_BUFFER_BIT);
+
+	gprintf(.02f, .05f, 0x00cf7f7f, "%dx%d", g_mousex, g_mousey);
 
 	renderGame(elapse);
 
@@ -710,29 +911,29 @@ void onFile(char* path)
 		n = fread(data, 1, size, fd);
 		fclose(fd);
 
-		int w = 0, h = 0, x = 0;
-		char* wp = data;
-		char* rp = data;
+		memset(&g_world, 0, sizeof(g_world));
 
-		for (int i = 0; i < n; ++i)
+		struct Crate* crate = g_world.crates;
+		char* dst = g_world.tiles;
+		char* src = data;
+
+		for (int i = 0, x = 0; i < n; ++i)
 		{
-			const char c = *rp++;
+			const char c = *src++;
 
-			if (c == '!' || c == 'X' || c == '.')
-				++x, *wp++ = c;
-			else if (c == 'C' || c == 'P')
-				++x, *wp++ = '.';
+			if (c == TILE_VOID || c == TILE_WALL || c == TILE_FLOOR || c == TILE_TARGET)
+				++x, *dst++ = c;
+			else if (c == TILE_CRATE)
+				crate->x = x++, (crate++)->y = g_world.ny, *dst++ = TILE_FLOOR;
+			else if (c == TILE_START)
+				g_world.startx = x++, g_world.starty = g_world.ny, *dst++ = TILE_FLOOR;
 			else if (c == '\n')
-				x = 0, ++h;
+				x = 0, ++g_world.ny;
 
-			w = max(w, x);
+			g_world.nx = max(g_world.nx, x);
 		}
 
-		g_map = (struct Map*) malloc(sizeof(struct Map) + (wp - data));
-		g_map->width = w;
-		g_map->height = h;
-		memcpy(g_map->data, data, wp - data);
-
+		g_world.ncrates = crate - g_world.crates;
 		free(data);
 	}
 	else if (strcmp(ext, ".mp3") == 0)
@@ -771,6 +972,7 @@ void init(int* argc, char* argv[])
 	glutKeyboardFunc(&onKeyDown);
 	glutKeyboardUpFunc(&onKeyUp);
 	glutMouseFunc(&onMouse);
+	glutMotionFunc(&onMotion);
 	glutPassiveMotionFunc(&onMotion);
 	glutReshapeFunc(&onReshape);
 	glutDisplayFunc(&onDisplay);
