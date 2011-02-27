@@ -31,7 +31,7 @@
 				snprintf(_name, sizeof(_name), path "/%s", _data.cFileName); \
 				func(_name); \
 			} while (FindNextFile(_find, &_data)); \
-		FindClose(_find); \
+			FindClose(_find); \
 		} \
 	} while (0)
 # define snooze(msec) Sleep(msec)
@@ -49,6 +49,7 @@
 				snprintf(_name, sizeof(_name), path "/%s", _de->d_name); \
 				func(_name); \
 			} \
+			closedir(_dir); \
 		} \
 	} while (0)
 # define snooze(msec) \
@@ -145,7 +146,15 @@ char* g_textEnd;
 
 #define TEX_CRATE (0)
 #define TEX_PLAYER (1)
-#define NUM_TEX (4)
+#define NUM_TEX (2)
+
+#define texUvPlayer(u0,v0,u1,v1,su,sv) \
+	do { \
+		u0 = floorf(((su) >= .75f ? (su) - .5f : (su)) / .25f) * .2f - .02f; \
+		u1 = (u0) + .19f; \
+		v0 = floorf((sv) / .25f) * .25f; \
+		v1 = (v0) + .25f; \
+	} while (0)
 
 const char* g_texnames[] = {"crate", "player"};
 unsigned g_tex[NUM_TEX];
@@ -191,7 +200,7 @@ struct Crate* worldCrate(int x, int y)
 
 void gprintf(float x, float y, unsigned c, const char* fmt, ...);
 void quad(float x, float y, float s, unsigned c);
-void sprite(float x, float y, float s, unsigned texId);
+void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1);
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -226,22 +235,22 @@ void gameStart(float elapse, unsigned* stage)
 		gs->fx = g_width * .5f;
 		gs->fy = g_height * .5f;
 		gs->px = g_width * .5f - 64.f;
-		gs->py = g_height * .5f - 32.f;
+		gs->py = g_height * .5f - 48.f;
 
 		gs->cx[0] = gs->px - 72.f;
-		gs->cy[0] = gs->py - 8.f;
+		gs->cy[0] = gs->py + 12.f;
 		gs->cs[0] = 48.f;
 		gs->crx[0] = 60.f;
 		gs->cry[0] = 30.f;
 
 		gs->cx[1] = gs->px + 72.f;
-		gs->cy[1] = gs->py - 16.f;
+		gs->cy[1] = gs->py + 4.f;
 		gs->cs[1] = 64.f;
 		gs->crx[1] = 40.f;
 		gs->cry[1] = 20.f;
 
 		gs->cx[2] = gs->px - 32.f;
-		gs->cy[2] = gs->py - 20.f;
+		gs->cy[2] = gs->py;
 		gs->cs[2] = 96.f;
 		gs->crx[2] = 30.f;
 		gs->cry[2] = 10.f;
@@ -264,10 +273,12 @@ void gameStart(float elapse, unsigned* stage)
 		float rx = gs->crx[i];
 		float ry = gs->cry[i];
 
-		sprite((x - rx * .5f) + (rx * dx), (y - ry * .5f) + (ry * dy), s, TEX_CRATE);
+		sprite((x - rx * .5f) + (rx * dx), (y - ry * .5f) + (ry * dy), s, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
 	}
 
-	sprite(gs->px, gs->py, 128.f, TEX_PLAYER);
+	float u0, v0, u1, v1;
+	texUvPlayer(u0, v0, u1, v1, .25f, .5f);
+	sprite(gs->px, gs->py, 128.f, TEX_PLAYER, u0, v0, u1, v1);
 
 	static const unsigned colors[] = {0x0000ff00, 0x00ffffff};
 	unsigned color = colors[gs->state];
@@ -536,9 +547,11 @@ void gamePlay(float elapse, unsigned* stage)
 ignore_mouse_input:
 	;
 
-	const float tt = .1f;
+	const float tt = .5f;
 
-	if ((p->time += elapse) >= tt)
+	if (p->path < 0 && !p->move)
+		;
+	else if ((p->time += elapse) >= tt)
 	{
 		p->time -= tt;
 
@@ -607,8 +620,10 @@ ignore_mouse_input:
 		}
 	}
 
-	const float ix = (p->ix - p->x) * ss * (p->time / tt);
-	const float iy = (p->iy - p->y) * ss * (p->time / tt);
+	const int dx = p->ix - p->x;
+	const int dy = p->iy - p->y;
+	const float ix = dx * ss * (p->time / tt);
+	const float iy = dy * ss * (p->time / tt);
 
 	for (int i = 0; i < g_world.ncrates; ++i)
 	{
@@ -623,7 +638,7 @@ ignore_mouse_input:
 			yy += iy;
 		}
 
-		quad(xx, yy, ss, 0x0000bfbf);
+		sprite(xx, yy, ss, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
 	}
 
 	if (buttonHeld(0))
@@ -634,14 +649,21 @@ ignore_mouse_input:
 		if ((x0 == x1 && y0 != y1) || (x0 != y1 && y0 == y1))
 		{
 			for (int i = x0; i <= x1 && worldTile(x0, y0) == TILE_FLOOR; ++i)
-				quad(posX(i, ss), posY(y0, ss), ss, 0x007fcf3f);
+				quad(posX(i, ss), posY(y0, ss), ss, 0x007fcf7f);
 
 			for (int i = y0; i <= y1 && worldTile(x0, y0) == TILE_FLOOR; ++i)
-				quad(posX(x0, ss), posY(i, ss), ss, 0x007fcf3f);
+				quad(posX(x0, ss), posY(i, ss), ss, 0x007fcf7f);
 		}
 	}
 
-	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER);
+	const float su = dx || dy ? clamp(p->time / tt, 0.f, 1.f) : .25f;
+	const float sv =
+		dx < 0 ? .75f : dx > 0 ? .25f :
+		dy < 0 ? .0f : dy > 0 ? .5f : .5f;
+
+	float u0, v0, u1, v1;
+	texUvPlayer(u0, v0, u1, v1, su, sv);
+	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -723,27 +745,23 @@ void gprintf(float x, float y, unsigned c, const char* fmt, ...)
 
 void quad(float x, float y, float s, unsigned c)
 {
-	const float r = s * .5f;
-
 	glColor4ubv((unsigned char*) &c);
 
 	glPushMatrix();
 	glTranslatef(x, y, 0.f);
 
 	glBegin(GL_QUADS);
-		glVertex2f(-r, r);
-		glVertex2f(r, r);
-		glVertex2f(r, -r);
-		glVertex2f(-r, -r);
+		glVertex2f(-(s * .5f), s * .5f);
+		glVertex2f(s * .5f, s * .5f);
+		glVertex2f(s * .5f, -(s * .5f));
+		glVertex2f(-(s * .5f), -(s * .5f));
 	glEnd();
 
 	glPopMatrix();
 }
 
-void sprite(float x, float y, float s, unsigned texId)
+void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1)
 {
-	const float r = s * .5f;
-
 	glColor3f(1.f, 1.f, 1.f);
 
 	glPushMatrix();
@@ -760,10 +778,10 @@ void sprite(float x, float y, float s, unsigned texId)
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	glBegin(GL_QUADS);
-		glTexCoord2f(0.f, 1.f), glVertex2f(-r, r);
-		glTexCoord2f(1.f, 1.f), glVertex2f(r, r);
-		glTexCoord2f(1.f, 0.f), glVertex2f(r, -r);
-		glTexCoord2f(0.f, 0.f), glVertex2f(-r, -r);
+		glTexCoord2f(u0, v1), glVertex2f(-(s * .5f), s * .5f);
+		glTexCoord2f(u1, v1), glVertex2f(s * .5f, s * .5f);
+		glTexCoord2f(u1, v0), glVertex2f(s * .5f, -(s * .5f));
+		glTexCoord2f(u0, v0), glVertex2f(-(s * .5f), -(s * .5f));
 	glEnd();
 
 	glDisable(GL_TEXTURE_2D);
