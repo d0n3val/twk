@@ -13,6 +13,7 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 #include <assert.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -346,6 +347,7 @@ struct Move
 struct GamePlay
 {
 	int init;
+	float intro;
 	struct Player player;
 	struct Move move;
 	int npath;
@@ -497,11 +499,14 @@ void gamePlay(float elapse, unsigned* stage)
 	if (!gp->init)
 	{
 		gp->init = 1;
+		gp->intro = -M_PI;
 		load_map(g_maps[g_current_map]);
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
 		p->path = -1;
 	}
+
+	gp->intro = min(gp->intro + 16.f * elapse, M_PI * 4.5f);
 
 	if (keyDown('r'))
 		--(*stage);
@@ -701,7 +706,11 @@ ignore_mouse_input:
 			yy += iy;
 		}
 
-		sprite(xx, yy, ss, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
+		const float t = gp->intro + (float) rand() / RAND_MAX * M_PI;
+		const float w = t / (M_PI * 4.5f);
+		const float ss2 = ss * .5f + ss * (cosf(t) + 1.f) * .5f;
+		const float ss3 = w * ss + (1.f - w) * ss2;
+		sprite(xx, yy, ss3, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
 	}
 
 	if (buttonHeld(0))
