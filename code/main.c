@@ -147,6 +147,12 @@ char* g_textEnd;
 #define TEX_CRATE (0)
 #define TEX_PLAYER (1)
 #define NUM_TEX (2)
+#define NUM_MAPS (20)
+#define PATH_NAME_SIZE (64)
+
+char g_maps[NUM_MAPS][PATH_NAME_SIZE];
+int g_last_map = -1;
+int g_current_map = 0;
 
 #define texUvPlayer(u0,v0,u1,v1,su,sv) \
 	do { \
@@ -254,6 +260,8 @@ void gameStart(float elapse, unsigned* stage)
 		gs->cs[2] = 96.f;
 		gs->crx[2] = 30.f;
 		gs->cry[2] = 10.f;
+
+		g_current_map = 0;
 	}
 
 	if (gs->mx != g_mousex)
@@ -282,16 +290,29 @@ void gameStart(float elapse, unsigned* stage)
 
 	static const unsigned colors[] = {0x0000ff00, 0x00ffffff};
 	unsigned color = colors[gs->state];
+	char map_name[PATH_NAME_SIZE];
+
+	sscanf(g_maps[g_current_map], "%*[^/]/%64[^.]", map_name);
 
 	gprintf(.5f, .5f, 0x00ff00ff, "Touchy Warehouse Keeper");
 	gprintf(.5f, .52f, 0x00ff00ff, "v0.1");
-	gprintf(.5f, .56f, color, "Click to continue");
+	gprintf(.5f, .56f, 0x00ff00ff, "Map (right click to cicle): %s", map_name);
+	gprintf(.5f, .60f, color, "Click to continue");
 
 	if ((gs->blink += elapse) >= 1.f)
 		gs->blink -= 1.f, gs->state ^= 1;
 
+	if (buttonDown(2))
+	{
+		if (g_current_map < g_last_map)
+			++g_current_map;
+		else
+			g_current_map = 0;
+	}
+
 	if (buttonUp(0))
 		++(*stage);
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -425,6 +446,47 @@ float posY(int y, int s) { return g_height * .5f - s * (g_world.ny * .5f) + y * 
 int unposX(float x, int s) { return (x + s *.5f - (g_width * .5f - s * (g_world.nx * .5f))) / s; }
 int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world.ny * .5f))) / s; }
 
+void load_map(const char* path)
+{
+		FILE* fd;
+		long size;
+		char* data;
+		int n;
+
+		fd = fopen(path, "rb");
+		fseek(fd, 0, SEEK_END);
+		size = ftell(fd);
+		rewind(fd);
+		data = (char*) malloc(size);
+		n = fread(data, 1, size, fd);
+		fclose(fd);
+
+		memset(&g_world, 0, sizeof(g_world));
+
+		struct Crate* crate = g_world.crates;
+		char* dst = g_world.tiles;
+		char* src = data;
+
+		for (int i = 0, x = 0; i < n; ++i)
+		{
+			const char c = *src++;
+
+			if (c == TILE_VOID || c == TILE_WALL || c == TILE_FLOOR || c == TILE_TARGET)
+				++x, *dst++ = c;
+			else if (c == TILE_CRATE)
+				crate->x = x++, (crate++)->y = g_world.ny, *dst++ = TILE_FLOOR;
+			else if (c == TILE_START)
+				g_world.startx = x++, g_world.starty = g_world.ny, *dst++ = TILE_FLOOR;
+			else if (c == '\n')
+				x = 0, ++g_world.ny;
+
+			g_world.nx = max(g_world.nx, x);
+		}
+
+		g_world.ncrates = crate - g_world.crates;
+		free(data);
+}
+
 void gamePlay(float elapse, unsigned* stage)
 {
 	struct GamePlay* gp = &g_gamePlay;
@@ -435,6 +497,7 @@ void gamePlay(float elapse, unsigned* stage)
 	if (!gp->init)
 	{
 		gp->init = 1;
+		load_map(g_maps[g_current_map]);
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
 		p->path = -1;
@@ -941,38 +1004,8 @@ void onFile(char* path)
 	}
 	else if (strcmp(ext, ".map") == 0)
 	{
-		fd = fopen(path, "rb");
-		fseek(fd, 0, SEEK_END);
-		size = ftell(fd);
-		rewind(fd);
-		data = (char*) malloc(size);
-		n = fread(data, 1, size, fd);
-		fclose(fd);
-
-		memset(&g_world, 0, sizeof(g_world));
-
-		struct Crate* crate = g_world.crates;
-		char* dst = g_world.tiles;
-		char* src = data;
-
-		for (int i = 0, x = 0; i < n; ++i)
-		{
-			const char c = *src++;
-
-			if (c == TILE_VOID || c == TILE_WALL || c == TILE_FLOOR || c == TILE_TARGET)
-				++x, *dst++ = c;
-			else if (c == TILE_CRATE)
-				crate->x = x++, (crate++)->y = g_world.ny, *dst++ = TILE_FLOOR;
-			else if (c == TILE_START)
-				g_world.startx = x++, g_world.starty = g_world.ny, *dst++ = TILE_FLOOR;
-			else if (c == '\n')
-				x = 0, ++g_world.ny;
-
-			g_world.nx = max(g_world.nx, x);
-		}
-
-		g_world.ncrates = crate - g_world.crates;
-		free(data);
+		g_last_map++;
+		strncpy(g_maps[g_last_map], path, PATH_NAME_SIZE);
 	}
 	else if (strcmp(ext, ".mp3") == 0)
 	{
@@ -982,6 +1015,7 @@ void onFile(char* path)
 #endif
 	}
 }
+
 
 void init(int* argc, char* argv[])
 {
