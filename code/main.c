@@ -147,13 +147,8 @@ char* g_textEnd;
 
 #define TEX_CRATE (0)
 #define TEX_PLAYER (1)
-#define NUM_TEX (2)
-#define NUM_MAPS (20)
-#define PATH_NAME_SIZE (64)
-
-char g_maps[NUM_MAPS][PATH_NAME_SIZE];
-int g_last_map = -1;
-int g_current_map = 0;
+#define TEX_CLOUD (2)
+#define NUM_TEX (3)
 
 #define texUvPlayer(u0,v0,u1,v1,su,sv) \
 	do { \
@@ -163,8 +158,15 @@ int g_current_map = 0;
 		v1 = (v0) + .25f; \
 	} while (0)
 
-const char* g_texnames[] = {"crate", "player"};
+const char* g_texnames[] = {"crate", "player", "cloud"};
 unsigned g_tex[NUM_TEX];
+
+#define NUM_MAPS (20)
+#define PATH_NAME_SIZE (64)
+
+char g_maps[NUM_MAPS][PATH_NAME_SIZE];
+int g_last_map = -1;
+int g_current_map = 0;
 
 #define TILE_VOID ('!')
 #define TILE_WALL ('X')
@@ -209,6 +211,49 @@ void gprintf(float x, float y, unsigned c, const char* fmt, ...);
 void quad(float x, float y, float s, unsigned c);
 void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1);
 
+struct Spring
+{
+	float dist;
+	float mass;
+	float damp;
+	float k;
+	float x, y;
+	float vx, vy;
+	float fx, fy;
+};
+
+void springUpdate(float attx, float atty, struct Spring* s, float elapse)
+{
+	s->fx = 0.f;
+	s->fy = -9.81f * s->mass;
+
+	float x = s->x - attx;
+	float y = s->y - atty;
+	float n = sqrtf(x * x + y * y);
+
+	if (n - s->dist >= .001f)
+	{
+		float i = -s->k * (n - s->dist);
+
+		x /= n;
+		y /= n;
+
+		n = sqrtf(x * x + y * y);
+
+		s->fx += x / n * i - .25f * s->vx;
+		s->fy += y / n * i - .25f * s->vy;
+	}
+
+	s->vx += s->fx / s->mass * elapse;
+	s->vy += s->fy / s->mass * elapse;
+
+	s->x += s->vx;
+	s->y += s->vy;
+
+	s->vx *= s->damp;
+	s->vy *= s->damp;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -227,6 +272,8 @@ struct GameStart
 	float cx[3], cy[3], cs[3], crx[3], cry[3];
 	float blink;
 	unsigned state;
+	float sx[2], sy[2];
+	struct Spring spring[2];
 } g_gameStart;
 
 void gameStart(float elapse, unsigned* stage)
@@ -263,6 +310,32 @@ void gameStart(float elapse, unsigned* stage)
 		gs->cry[2] = 10.f;
 
 		g_current_map = 0;
+
+		gs->sx[0] = .3f;
+		gs->sy[0] = 2.2f;
+		gs->spring[0].mass = .06f;
+		gs->spring[0].damp = .99f;
+		gs->spring[0].dist = .2f;
+		gs->spring[0].k = .5f;
+		gs->spring[0].x = .3f;
+		gs->spring[0].y = 1.1f;
+		gs->spring[0].vx = 0.f;
+		gs->spring[0].vy = 0.f;
+		gs->spring[0].fx = 0.f;
+		gs->spring[0].fy = 0.f;
+
+		gs->sx[1] = .7f;
+		gs->sy[1] = 1.8f;
+		gs->spring[1].mass = .1f;
+		gs->spring[1].damp = .9f;
+		gs->spring[1].dist = .2f;
+		gs->spring[1].k = 1.1f;
+		gs->spring[1].x = .5f;
+		gs->spring[1].y = 1.1f;
+		gs->spring[1].vx = 0.f;
+		gs->spring[1].vy = 0.f;
+		gs->spring[1].fx = 0.f;
+		gs->spring[1].fy = 0.f;
 	}
 
 	if (gs->mx != g_mousex)
@@ -273,6 +346,52 @@ void gameStart(float elapse, unsigned* stage)
 
 	float dx = (gs->fx - gs->px) / g_width;
 	float dy = (gs->fy - gs->py) / g_height;
+
+	for (unsigned i = 0; i < arrayCount(gs->spring); ++i)
+	{
+		float hw = g_width;
+		float hh = g_height;
+
+		float attx = gs->sx[i] - 50.f / hw + 100.f / hw * dx;
+		float atty = gs->sy[i] + 20.f / hh - 40.f / hh * dy;
+
+		// solve spring
+
+		springUpdate(attx, atty, &gs->spring[i], elapse * .2f);
+
+		float sx = gs->spring[i].x, sy = gs->spring[i].y;
+		float sl = sqrtf(sx * sx + sy * sy);
+		sx /= sl, sy /= sl;
+
+		float ax = attx, ay = atty;
+		float al = sqrtf(ax * ax + ay * ay);
+		ax /= al, ay /= al;
+
+		float a = acosf(sx * ax + sy * ay);
+		if (fabsf(a) >= .0001f)
+			a /= M_PI, a *= 180.f;
+		else
+			a = 0.f;
+
+		float cz = sx * ay - sy * ax;
+
+		// draw it..
+
+		attx = attx * g_width;
+		atty = g_height - atty * g_height;
+
+		glColor3f(1.f, 1.f, 1.f);
+		glBegin(GL_LINES);
+			glVertex2f(attx, atty);
+			glVertex2f(gs->spring[i].x * g_width, g_height - gs->spring[i].y * g_height);
+		glEnd();
+
+		glPushMatrix();
+			glTranslatef(gs->spring[i].x * g_width, g_height - gs->spring[i].y * g_height, 0.f);
+			glRotatef(a, 0.f, 0.f, cz);
+			sprite(0.f, 0.f, 192.f + i * 128.f, TEX_CLOUD, 0, 0, 1, 1);
+		glPopMatrix();
+	}
 
 	for (int i = 0; i < 3; ++i)
 	{
@@ -297,7 +416,7 @@ void gameStart(float elapse, unsigned* stage)
 
 	gprintf(.5f, .5f, 0x00ff00ff, "Touchy Warehouse Keeper");
 	gprintf(.5f, .52f, 0x00ff00ff, "v0.1");
-	gprintf(.5f, .56f, 0x00ff00ff, "Map (right click to cicle): %s", map_name);
+	gprintf(.5f, .56f, 0x00ff00ff, "Map (right click to cycle): %s", map_name);
 	gprintf(.5f, .60f, color, "Click to continue");
 
 	if ((gs->blink += elapse) >= 1.f)
@@ -707,7 +826,7 @@ ignore_mouse_input:
 		}
 
 		const float t = gp->intro + (float) rand() / RAND_MAX * M_PI;
-		const float w = t / (M_PI * 4.5f);
+		const float w = min(t / (M_PI * 4.5f), 1.f);
 		const float ss2 = ss * .5f + ss * (cosf(t) + 1.f) * .5f;
 		const float ss3 = w * ss + (1.f - w) * ss2;
 		sprite(xx, yy, ss3, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
@@ -1005,6 +1124,8 @@ void onFile(char* path)
 		data = (char*) malloc(size);
 		n = fread(data, 1, size, fd);
 		fclose(fd);
+
+		assert(n == w * h * 4);
 
 		glGenTextures(1, &g_tex[i]);
 		glBindTexture(GL_TEXTURE_2D, g_tex[i]);
