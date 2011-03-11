@@ -914,7 +914,7 @@ void renderGame(float elapse)
 
 	if (currentStage != stage)
 	{
-		if (stage == ~0)
+		if (stage == ~0u)
 			stage = currentStage;
 
 		memset(g_stages[stage].data, 0, g_stages[stage].size);
