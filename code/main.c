@@ -467,6 +467,7 @@ struct Move
 struct GamePlay
 {
 	int init;
+	int moves;
 	float intro;
 	struct Player player;
 	struct Move move;
@@ -622,7 +623,9 @@ void gamePlay(float elapse, unsigned* stage)
 	{
 		gp->init = 1;
 		gp->intro = -M_PI;
+
 		load_map(g_maps[g_current_map]);
+
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
 		p->path = -1;
@@ -630,8 +633,10 @@ void gamePlay(float elapse, unsigned* stage)
 
 	gp->intro = min(gp->intro + 16.f * elapse, M_PI * 4.5f);
 
-	if (keyDown('r'))
+	if (keyDown('q'))
 		--(*stage);
+	else if (keyDown('r'))
+		*stage = ~0;
 
 	if (p->path >= 0 || p->move)
 		goto ignore_mouse_input;
@@ -778,6 +783,7 @@ ignore_mouse_input:
 				p->ix = p->x;
 				p->iy = p->y;
 				p->move = 0;
+				++gp->moves;
 
 				m->x0 = -1;
 				m->y0 = -1;
@@ -858,6 +864,9 @@ ignore_mouse_input:
 	float u0, v0, u1, v1;
 	texUvPlayer(u0, v0, u1, v1, su, sv);
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
+
+	gprintf(.02f, .05f, 0x00ffffff, "MOVES: %d", gp->moves);
+	gprintf(.02f, .95f, 0x00ffffff, "[Q]UIT  [R]ETRY");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -903,11 +912,13 @@ void renderGame(float elapse)
 
 	(*g_stages[stage].func)(elapse, &stage);
 
-	if (stage >= sizeof(g_stages) / sizeof(g_stages[0]))
-		exit(0);
-
 	if (currentStage != stage)
+	{
+		if (stage == ~0)
+			stage = currentStage;
+
 		memset(g_stages[stage].data, 0, g_stages[stage].size);
+	}
 
 	currentStage = stage;
 }
@@ -1055,8 +1066,6 @@ void onDisplay()
 
 	glClearColor(.1f, .1f, .3f, 0.f);
 	glClear(GL_COLOR_BUFFER_BIT);
-
-	gprintf(.02f, .05f, 0x00cf7f7f, "%dx%d", g_mousex, g_mousey);
 
 	renderGame(elapse);
 
