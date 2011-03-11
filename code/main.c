@@ -464,11 +464,20 @@ struct Move
 	int ci;
 };
 
+struct Timer
+{
+	float elapse;
+	int hours;
+	int minutes;
+	int seconds;
+};
+
 struct GamePlay
 {
 	int init;
 	int moves;
 	float intro;
+	struct Timer timer;
 	struct Player player;
 	struct Move move;
 	int npath;
@@ -629,6 +638,20 @@ void gamePlay(float elapse, unsigned* stage)
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
 		p->path = -1;
+	}
+
+	if ((gp->timer.elapse += elapse) >= 1.f)
+	{
+		gp->timer.elapse -= 1.f;
+
+		if (++gp->timer.seconds == 60) {
+			gp->timer.seconds = 0;
+
+			if (++gp->timer.minutes == 60) {
+				gp->timer.minutes = 0;
+				++gp->timer.hours;
+			}
+		}
 	}
 
 	gp->intro = min(gp->intro + 16.f * elapse, M_PI * 4.5f);
@@ -865,7 +888,9 @@ ignore_mouse_input:
 	texUvPlayer(u0, v0, u1, v1, su, sv);
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
 
-	gprintf(.02f, .05f, 0x00ffffff, "MOVES: %d", gp->moves);
+	gprintf(.02f, .05f, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
+	gprintf(.02f, .07f, 0x00ffffff, "MOVES: %d", gp->moves);
+
 	gprintf(.02f, .95f, 0x00ffffff, "[Q]UIT  [R]ETRY");
 }
 
