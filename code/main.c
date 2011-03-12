@@ -145,6 +145,9 @@ struct Text
 char g_textBuffer[2048];
 char* g_textEnd;
 
+#define SAVE_GAME_VERSION (2)
+#define SAVE_GAME_PATH ("data/save.bin")
+
 #define TEX_CRATE (0)
 #define TEX_PLAYER (1)
 #define TEX_CLOUD (2)
@@ -267,6 +270,8 @@ void springUpdate(float attx, float atty, struct Spring* s, float elapse)
 struct GameStart
 {
 	int init;
+	int hasSaveGame;
+	int loadGameOnStart;
 	float mx, my;
 	float fx, fy;
 	float px, py;
@@ -337,6 +342,20 @@ void gameStart(float elapse, unsigned* stage)
 		gs->spring[1].vy = 0.f;
 		gs->spring[1].fx = 0.f;
 		gs->spring[1].fy = 0.f;
+
+		FILE* fd;
+		int ver;
+
+		if ((fd = fopen(SAVE_GAME_PATH, "rb")) != NULL)
+		{
+			if (fread(&ver, sizeof(ver), 1, fd) != 1)
+				fprintf(stderr, "Failed to read version\n");
+
+			if (ver == SAVE_GAME_VERSION)
+				gs->hasSaveGame = 1;
+
+			fclose(fd);
+		}
 	}
 
 	if (gs->mx != g_mousex)
@@ -420,6 +439,9 @@ void gameStart(float elapse, unsigned* stage)
 	gprintf(.5f, .56f, 0x00ff00ff, "Map (right click to cycle): %s", map_name);
 	gprintf(.5f, .60f, color, "Click to continue");
 
+	if (gs->hasSaveGame)
+		gprintf(.02f, .95f, 0x00ffffff, "[C]ONTINUE");
+
 	if ((gs->blink += elapse) >= 1.f)
 		gs->blink -= 1.f, gs->state ^= 1;
 
@@ -431,9 +453,8 @@ void gameStart(float elapse, unsigned* stage)
 			g_current_map = 0;
 	}
 
-	if (buttonUp(0))
+	if (buttonUp(0) || !!(gs->loadGameOnStart = keyDown('c')))
 		++(*stage);
-
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -578,7 +599,7 @@ float posY(int y, int s) { return g_height * .5f - s * (g_world.ny * .5f) + y * 
 int unposX(float x, int s) { return (x + s *.5f - (g_width * .5f - s * (g_world.nx * .5f))) / s; }
 int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world.ny * .5f))) / s; }
 
-void load_map(const char* path)
+void loadMap(const char* path)
 {
 		FILE* fd;
 		long size;
@@ -621,6 +642,50 @@ void load_map(const char* path)
 		free(data);
 }
 
+void saveGame()
+{
+	FILE* fd;
+	int ver = SAVE_GAME_VERSION;
+
+	if ((fd = fopen(SAVE_GAME_PATH, "wb")) != NULL)
+	{
+		fwrite(&ver, sizeof(ver), 1, fd);
+		fwrite(&g_current_map, sizeof(g_current_map), 1, fd);
+		fwrite(&g_world, sizeof(g_world), 1, fd);
+		fwrite(&g_gamePlay, sizeof(g_gamePlay), 1, fd);
+		fclose(fd);
+	}
+	else fprintf(stderr, "Failed to save game state\n");
+}
+
+void loadGame()
+{
+	FILE* fd;
+	int ver = -1;
+
+	if ((fd = fopen(SAVE_GAME_PATH, "rb")) != NULL)
+	{
+		if (fread(&ver, sizeof(ver), 1, fd) != 1)
+			fprintf(stderr, "Failed to read version\n");
+
+		if (ver == SAVE_GAME_VERSION)
+		{
+			if (fread(&g_current_map, sizeof(g_current_map), 1, fd) != 1)
+				fprintf(stderr, "Failed to read map id\n");
+
+			if (fread(&g_world, sizeof(g_world), 1, fd) != 1)
+				fprintf(stderr, "Failed to read world\n");
+
+			if (fread(&g_gamePlay, sizeof(g_gamePlay), 1, fd) != 1)
+				fprintf(stderr, "Failed to read gameplay\n");
+		}
+		else fprintf(stderr, "Version mismatch in game state\n");
+
+		fclose(fd);
+	}
+	else fprintf(stderr, "Failed to load game state\n");
+}
+
 void gamePlay(float elapse, unsigned* stage)
 {
 	struct GamePlay* gp = &g_gamePlay;
@@ -633,11 +698,18 @@ void gamePlay(float elapse, unsigned* stage)
 		gp->init = 1;
 		gp->intro = -M_PI;
 
-		load_map(g_maps[g_current_map]);
+		if (!g_gameStart.loadGameOnStart)
+			loadMap(g_maps[g_current_map]);
 
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
 		p->path = -1;
+
+		if (g_gameStart.loadGameOnStart)
+		{
+			g_gameStart.loadGameOnStart = 0;
+			loadGame();
+		}
 	}
 
 	if ((gp->timer.elapse += elapse) >= 1.f)
@@ -656,8 +728,11 @@ void gamePlay(float elapse, unsigned* stage)
 
 	gp->intro = min(gp->intro + 16.f * elapse, M_PI * 4.5f);
 
-	if (keyDown('q'))
+	if (keyDown('p'))
+	{
+		saveGame();
 		--(*stage);
+	}
 	else if (keyDown('r'))
 		*stage = ~0;
 
@@ -888,10 +963,14 @@ ignore_mouse_input:
 	texUvPlayer(u0, v0, u1, v1, su, sv);
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
 
-	gprintf(.02f, .05f, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
-	gprintf(.02f, .07f, 0x00ffffff, "MOVES: %d", gp->moves);
+	char name[PATH_NAME_SIZE];
+	sscanf(g_maps[g_current_map], "%*[^/]/%64[^.]", name);
 
-	gprintf(.02f, .95f, 0x00ffffff, "[Q]UIT  [R]ETRY");
+	gprintf(.02f, .05f, 0x00ffffff, "LEVEL: %s", name);
+	gprintf(.02f, .07f, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
+	gprintf(.02f, .09f, 0x00ffffff, "MOVES: %d", gp->moves);
+
+	gprintf(.02f, .95f, 0x00ffffff, "[P]AUSE  [R]ESTART");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
