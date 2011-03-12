@@ -177,6 +177,7 @@ int g_current_map = 0;
 #define TILE_START ('$')
 #define TILE_START_TARGET ('@')
 #define TILE_CRATE ('#')
+#define TILE_CRATE_TARGET ('%')
 #define TILE_TARGET ('*')
 #define TILE_UNKNOWN ('?')
 
@@ -628,6 +629,8 @@ void loadMap(const char* path)
 				++x, *dst++ = c;
 			else if (c == TILE_CRATE)
 				crate->x = x++, (crate++)->y = g_world.ny, *dst++ = TILE_FLOOR;
+			else if (c == TILE_CRATE_TARGET)
+				crate->x = x++, (crate++)->y = g_world.ny, *dst++ = TILE_TARGET;
 			else if (c == TILE_START)
 				g_world.startx = x++, g_world.starty = g_world.ny, *dst++ = TILE_FLOOR;
 			else if (c == TILE_START_TARGET)
