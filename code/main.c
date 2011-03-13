@@ -92,6 +92,8 @@
 #define buttonUp(b) (!(g_buttons[0] & (1 << (b))) && (g_buttons[1] & (1 << (b))))
 #define buttonHeld(b) (g_buttons[0] & (1 << (b)))
 
+#define DATA_DIR "data/"
+
 unsigned long long g_clock;
 double g_period;
 float g_elapse;
@@ -164,10 +166,6 @@ unsigned g_tex[NUM_TEX];
 #define NUM_MAPS (20)
 #define PATH_NAME_SIZE (64)
 
-char g_maps[NUM_MAPS][PATH_NAME_SIZE];
-int g_last_map = -1;
-int g_current_map = 0;
-
 #define TILE_VOID ('!')
 #define TILE_WALL ('X')
 #define TILE_FLOOR ('.')
@@ -192,6 +190,51 @@ struct World
 };
 
 struct World g_world;
+
+struct MapInfo
+{
+	char name[80];
+	char file[PATH_NAME_SIZE];
+	char music[PATH_NAME_SIZE];
+	char bg[PATH_NAME_SIZE];
+	int par;
+};
+
+#define MAX_MAPS 20
+
+struct MapInfo g_map_progression[MAX_MAPS];
+int g_current_map = 0;
+
+#define CFG_HEADER "map"
+#define CFG_NAME "name"
+#define CFG_MUSIC "music"
+#define CFG_BG "bg"
+#define CFG_FILE "file"
+#define CFG_PAR "par"
+
+#if _WIN32
+HSTREAM g_musicStream = 0;
+#endif
+
+void playMusic(const char* path)
+{
+#if _WIN32
+	char data_path[PATH_NAME_SIZE] = DATA_DIR;
+	strcat(data_path, path);
+
+	printf("Loading [%s]\n", data_path);
+	if (g_musicStream != 0 )
+	{
+		BASS_ChannelStop(g_musicStream);
+		//BASS_StreamFree(g_musicStream);
+		g_musicStream = 0;
+	}
+		
+	g_musicStream = BASS_StreamCreateFile(FALSE, data_path, 0, 0, BASS_SAMPLE_LOOP);
+	BASS_ChannelPlay(g_musicStream, 0);
+#endif
+}
+
 
 int worldTile(int x, int y)
 {
@@ -283,6 +326,8 @@ void gameStart(float elapse, unsigned* stage)
 	if (!gs->init || g_reshape)
 	{
 		gs->init = 1;
+		playMusic("menu.mp3");
+		g_current_map = 0;
 
 		gs->mx = g_mousex;
 		gs->my = g_mousey;
@@ -308,8 +353,6 @@ void gameStart(float elapse, unsigned* stage)
 		gs->cs[2] = 96.f;
 		gs->crx[2] = 30.f;
 		gs->cry[2] = 10.f;
-
-		g_current_map = 0;
 
 		gs->sx[0] = .3f;
 		gs->sy[0] = 2.2f;
@@ -412,11 +455,9 @@ void gameStart(float elapse, unsigned* stage)
 	unsigned color = colors[gs->state];
 	char map_name[PATH_NAME_SIZE];
 
-	sscanf(g_maps[g_current_map], "%*[^/]/%64[^.]", map_name);
-
 	gprintf(.5f, .5f, 0x00ff00ff, "Touchy Warehouse Keeper");
 	gprintf(.5f, .52f, 0x00ff00ff, "v0.1");
-	gprintf(.5f, .56f, 0x00ff00ff, "Map (right click to cycle): %s", map_name);
+	gprintf(.5f, .56f, 0x00ff00ff, "Map (right click to cycle): %s", g_map_progression[g_current_map].name);
 	gprintf(.5f, .60f, color, "Click to continue");
 
 	if ((gs->blink += elapse) >= 1.f)
@@ -424,9 +465,8 @@ void gameStart(float elapse, unsigned* stage)
 
 	if (buttonDown(2))
 	{
-		if (g_current_map < g_last_map)
-			++g_current_map;
-		else
+		++g_current_map;
+		if(g_map_progression[g_current_map].par < 0)
 			g_current_map = 0;
 	}
 
@@ -568,20 +608,29 @@ float posY(int y, int s) { return g_height * .5f - s * (g_world.ny * .5f) + y * 
 int unposX(float x, int s) { return (x + s *.5f - (g_width * .5f - s * (g_world.nx * .5f))) / s; }
 int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world.ny * .5f))) / s; }
 
+char* load_file(const char *path, int *readed)
+{
+	FILE* fd;
+	long size;
+	char* data;
+
+	printf("Loading [%s]\n", path);
+	fd = fopen(path, "rb");
+	fseek(fd, 0, SEEK_END);
+	size = ftell(fd);
+	rewind(fd);
+	data = (char*) malloc(size);
+	*readed = fread(data, 1, size, fd);
+	fclose(fd);
+
+	return data;
+}
+
 void load_map(const char* path)
 {
-		FILE* fd;
-		long size;
-		char* data;
-		int n;
-
-		fd = fopen(path, "rb");
-		fseek(fd, 0, SEEK_END);
-		size = ftell(fd);
-		rewind(fd);
-		data = (char*) malloc(size);
-		n = fread(data, 1, size, fd);
-		fclose(fd);
+		int n = 0;
+		char data_path[PATH_NAME_SIZE] = DATA_DIR;
+		char* data = load_file(strcat(data_path, path), &n);
 
 		memset(&g_world, 0, sizeof(g_world));
 
@@ -609,6 +658,84 @@ void load_map(const char* path)
 		free(data);
 }
 
+void load_config(const char* path)
+{
+	int n = 0;
+	char* data = load_file(path, &n);
+	int map = -1; 
+
+	for (int i = 0; i < n; ++i)
+	{
+		if(data[i] == '\n' || data[i] == '\r') data[i] = 0;
+	}
+
+	for (int i = 0; i < n; ++i)
+	{
+		if (strncmp(&data[i], CFG_HEADER, strlen(CFG_HEADER)) == 0)
+		{
+			++map;
+			i += strlen(CFG_HEADER);
+			continue;
+		}
+
+		if (strncmp(&data[i], CFG_FILE, strlen(CFG_FILE)) == 0)
+		{
+			i += strlen(CFG_FILE) + 1;
+			strncpy(g_map_progression[map].file, &data[i], PATH_NAME_SIZE);
+			i += strlen(g_map_progression[map].file);
+			printf("file [%s]\n", g_map_progression[map].file);
+			continue;
+		}
+
+		if (strncmp(&data[i], CFG_NAME, strlen(CFG_NAME)) == 0)
+		{
+			i += strlen(CFG_NAME) + 1;
+			strncpy(g_map_progression[map].name, &data[i], PATH_NAME_SIZE);
+			i += strlen(g_map_progression[map].name);
+			printf("name [%s]\n", g_map_progression[map].name);
+			continue;
+		}
+
+		if (strncmp(&data[i], CFG_MUSIC, strlen(CFG_MUSIC)) == 0)
+		{
+			i += strlen(CFG_MUSIC) + 1;
+			strncpy(g_map_progression[map].music, &data[i], PATH_NAME_SIZE);
+			i += strlen(g_map_progression[map].music);
+			printf("music [%s]\n", g_map_progression[map].music);
+			continue;
+		}				
+
+		if (strncmp(&data[i], CFG_BG, strlen(CFG_BG)) == 0)
+		{
+			i += strlen(CFG_BG) + 1;
+			strncpy(g_map_progression[map].bg, &data[i], PATH_NAME_SIZE);
+			i += strlen(g_map_progression[map].bg);
+			printf("bg [%s]\n", g_map_progression[map].bg);
+			continue;
+		}
+
+		if (strncmp(&data[i], CFG_PAR, strlen(CFG_PAR)) == 0)
+		{
+			i += strlen(CFG_PAR) + 1;
+			g_map_progression[map].par = atoi(&data[i]);
+			continue;
+		}
+	}
+
+	free(data);
+
+	g_map_progression[++map].par = -1; // watermark
+}
+
+int checkWinConditions()
+{
+	for (int i = 0; i < g_world.ncrates; ++i)
+		if (worldTile(g_world.crates[i].x, g_world.crates[i].y) != TILE_TARGET)
+			return 0;
+
+	return 1;
+}
+
 void gamePlay(float elapse, unsigned* stage)
 {
 	struct GamePlay* gp = &g_gamePlay;
@@ -621,7 +748,8 @@ void gamePlay(float elapse, unsigned* stage)
 		gp->init = 1;
 		gp->intro = -M_PI;
 
-		load_map(g_maps[g_current_map]);
+		load_map(g_map_progression[g_current_map].file);
+		playMusic(g_map_progression[g_current_map].music);
 
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
@@ -634,6 +762,14 @@ void gamePlay(float elapse, unsigned* stage)
 		--(*stage);
 	else if (keyDown('r'))
 		*stage = ~0;
+
+	if (checkWinConditions() == 1) 
+	{
+		if(g_map_progression[++g_current_map].par < 0)
+			--(*stage);
+		else
+			*stage = ~0;
+	}
 
 	if (p->path >= 0 || p->move)
 		goto ignore_mouse_input;
@@ -862,8 +998,9 @@ ignore_mouse_input:
 	texUvPlayer(u0, v0, u1, v1, su, sv);
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
 
-	gprintf(.02f, .05f, 0x00ffffff, "MOVES: %d", gp->moves);
-	gprintf(.02f, .95f, 0x00ffffff, "[Q]UIT  [R]ETRY");
+	gprintf(.02f, .05f, 0x00ffffff, "%s", g_map_progression[g_current_map].name);
+	gprintf(.02f, .92f, 0x00ffffff, "Moves: %d Par: %d", gp->moves, g_map_progression[g_current_map].par);
+	gprintf(.02f, .95f, 0x00ffffff, "[Q]uit  [R]etry");
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1126,13 +1263,7 @@ void onFile(char* path)
 		if (i == NUM_TEX)
 			return;
 
-		fd = fopen(path, "rb");
-		fseek(fd, 0, SEEK_END);
-		size = ftell(fd);
-		rewind(fd);
-		data = (char*) malloc(size);
-		n = fread(data, 1, size, fd);
-		fclose(fd);
+		data = load_file(path, &n);
 
 		assert(n == w * h * 4);
 
@@ -1141,20 +1272,11 @@ void onFile(char* path)
 		glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		free(data);
 	}
-	else if (strcmp(ext, ".map") == 0)
+	else if (strcmp(ext, ".cfg") == 0)
 	{
-		g_last_map++;
-		strncpy(g_maps[g_last_map], path, PATH_NAME_SIZE);
-	}
-	else if (strcmp(ext, ".mp3") == 0)
-	{
-#if _WIN32
-		HSTREAM stream = BASS_StreamCreateFile(FALSE, path, 0, 0, BASS_SAMPLE_LOOP);
-		BASS_ChannelPlay(stream, 0);
-#endif
+		load_config(path);
 	}
 }
-
 
 void init(int* argc, char* argv[])
 {
