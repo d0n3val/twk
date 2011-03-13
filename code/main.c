@@ -763,7 +763,6 @@ void load_config(const char* path)
 			i += strlen(CFG_FILE) + 1;
 			strncpy(g_map_progression[map].file, &data[i], PATH_NAME_SIZE);
 			i += strlen(g_map_progression[map].file);
-			printf("file [%s]\n", g_map_progression[map].file);
 			continue;
 		}
 
@@ -772,7 +771,6 @@ void load_config(const char* path)
 			i += strlen(CFG_NAME) + 1;
 			strncpy(g_map_progression[map].name, &data[i], PATH_NAME_SIZE);
 			i += strlen(g_map_progression[map].name);
-			printf("name [%s]\n", g_map_progression[map].name);
 			continue;
 		}
 
@@ -781,7 +779,6 @@ void load_config(const char* path)
 			i += strlen(CFG_MUSIC) + 1;
 			strncpy(g_map_progression[map].music, &data[i], PATH_NAME_SIZE);
 			i += strlen(g_map_progression[map].music);
-			printf("music [%s]\n", g_map_progression[map].music);
 			continue;
 		}				
 
@@ -790,7 +787,6 @@ void load_config(const char* path)
 			i += strlen(CFG_BG) + 1;
 			strncpy(g_map_progression[map].bg, &data[i], PATH_NAME_SIZE);
 			i += strlen(g_map_progression[map].bg);
-			printf("bg [%s]\n", g_map_progression[map].bg);
 			continue;
 		}
 
