@@ -803,10 +803,18 @@ void load_config(const char* path)
 	g_map_progression[++map].par = -1; // watermark
 }
 
+int isTargetTile(int x, int y)
+{
+	int t = worldTile(x, y);
+	if (t == TILE_TARGET || t == TILE_START_TARGET || t == TILE_CRATE_TARGET )
+		return 1;
+	return 0;
+}
+
 int checkWinConditions()
 {
 	for (int i = 0; i < g_world.ncrates; ++i)
-		if (worldTile(g_world.crates[i].x, g_world.crates[i].y) != TILE_TARGET)
+		if (!isTargetTile(g_world.crates[i].x, g_world.crates[i].y))
 			return 0;
 
 	return 1;
