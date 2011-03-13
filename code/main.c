@@ -157,8 +157,8 @@ char* g_textEnd;
 
 #define texUvPlayer(u0,v0,u1,v1,su,sv) \
 	do { \
-		u0 = floorf(((su) >= .75f ? (su) - .5f : (su)) / .25f) * .2f - .02f; \
-		u1 = (u0) + .19f; \
+		u0 = floorf((su) / .25f) * .25f; \
+		u1 = (u0) + .25f; \
 		v0 = floorf((sv) / .25f) * .25f; \
 		v1 = (v0) + .25f; \
 	} while (0)
@@ -474,7 +474,6 @@ void gameStart(float elapse, unsigned* stage)
 
 	static const unsigned colors[] = {0x0000ff00, 0x00ffffff};
 	unsigned color = colors[gs->state];
-	char map_name[PATH_NAME_SIZE];
 
 	gprintf(.5f, .5f, 0x00ff00ff, "Touchy Warehouse Keeper");
 	gprintf(.5f, .52f, 0x00ff00ff, "v0.1");
@@ -538,6 +537,7 @@ struct GamePlay
 {
 	int init;
 	int moves;
+	int finished;
 	float intro;
 	struct Timer timer;
 	struct Player player;
@@ -830,6 +830,7 @@ void gamePlay(float elapse, unsigned* stage)
 	if (!gp->init)
 	{
 		gp->init = 1;
+		gp->finished = 0;
 		gp->intro = -M_PI;
 
 		if (!g_gameStart.loadGameOnStart)
@@ -848,6 +849,25 @@ void gamePlay(float elapse, unsigned* stage)
 			loadGame();
 			playMusic(g_map_progression[g_current_map].music);
 		}
+	}
+
+	int winConditions = checkWinConditions();
+
+	if (winConditions == 1) 
+	{
+		if (gp->finished == 0) 
+		{
+			playMusic("win.mp3");
+			gp->finished = 1;
+		}
+		if (buttonDown(0))
+		{
+			if(g_map_progression[++g_current_map].par < 0)
+				--(*stage);
+			else
+				*stage = ~0;
+		}
+		goto ignore_mouse_input;
 	}
 
 	if ((gp->timer.elapse += elapse) >= 1.f)
@@ -873,14 +893,6 @@ void gamePlay(float elapse, unsigned* stage)
 	}
 	else if (keyDown('r'))
 		*stage = ~0;
-
-	if (checkWinConditions() == 1) 
-	{
-		if(g_map_progression[++g_current_map].par < 0)
-			--(*stage);
-		else
-			*stage = ~0;
-	}
 
 	if (p->path >= 0 || p->move)
 		goto ignore_mouse_input;
@@ -1113,6 +1125,23 @@ ignore_mouse_input:
 	gprintf(.02f, .07f, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
 	gprintf(.02f, .09f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
 	gprintf(.02f, .95f, 0x00ffffff, "[P]AUSE  [R]ESTART");
+
+	if (winConditions == 1) 
+	{
+		float size = 210.f;
+		float x = g_width * .5f;
+		float y = g_height * .5f;
+		quad(x, y, size, 0x00cf7f7f);
+
+		float rxsize = (size*.37f) / g_width;
+		float rysize = (size*.37f) / g_height;
+		gprintf(0.5 - rxsize, 0.5 - rysize, 0x00ffffff, "* LEVEL COMPLETED *");
+		gprintf(0.5 - rxsize, 0.5 - rysize + 0.05f, 0x00ffffff, " Click to continue");
+
+		float u0, v0, u1, v1;
+		texUvPlayer(u0, v0, u1, v1, .25f, .5f);
+		sprite(x, y + 25.f, 128.f, TEX_PLAYER, u0, v0, u1, v1);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
