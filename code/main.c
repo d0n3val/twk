@@ -1071,6 +1071,21 @@ ignore_mouse_input:
 		}
 	}
 
+	if (buttonHeld(0) || p->path >= 0)
+	{
+		const int x0 = min(m->x0, m->x1), x1 = max(m->x0, m->x1);
+		const int y0 = min(m->y0, m->y1), y1 = max(m->y0, m->y1);
+
+		if ((x0 == x1 && y0 != y1) || (x0 != x1 && y0 == y1))
+		{
+			for (int i = x0; i <= x1; ++i)
+				quad(posX(i, ss), posY(y0, ss), ss * .25f, ~0);
+
+			for (int i = y0; i <= y1; ++i)
+				quad(posX(x0, ss), posY(i, ss), ss * .25f, ~0);
+		}
+	}
+
 	const int dx = p->ix - p->x;
 	const int dy = p->iy - p->y;
 	const float ix = dx * ss * (p->time / tt);
@@ -1097,21 +1112,6 @@ ignore_mouse_input:
 		const float ss2 = ss * .5f + ss * (cosf(t) + 1.f) * .5f;
 		const float ss3 = w * ss + (1.f - w) * ss2;
 		sprite(xx, yy, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
-	}
-
-	if (buttonHeld(0) || p->path >= 0)
-	{
-		const int x0 = min(m->x0, m->x1), x1 = max(m->x0, m->x1);
-		const int y0 = min(m->y0, m->y1), y1 = max(m->y0, m->y1);
-
-		if ((x0 == x1 && y0 != y1) || (x0 != x1 && y0 == y1))
-		{
-			for (int i = x0; i <= x1; ++i)
-				quad(posX(i, ss), posY(y0, ss), ss * .25f, ~0);
-
-			for (int i = y0; i <= y1; ++i)
-				quad(posX(x0, ss), posY(i, ss), ss * .25f, ~0);
-		}
 	}
 
 	const float su = dx || dy ? clamp(p->time / tt, 0.f, 1.f) : .25f;
