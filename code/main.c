@@ -152,8 +152,9 @@ char* g_textEnd;
 
 #define TEX_CRATE (0)
 #define TEX_PLAYER (1)
-#define TEX_CLOUD (2)
-#define NUM_TEX (3)
+#define TEX_WALLFLOOR (2)
+#define TEX_CLOUD (3)
+#define NUM_TEX (4)
 
 #define texUvPlayer(u0,v0,u1,v1,su,sv) \
 	do { \
@@ -163,7 +164,7 @@ char* g_textEnd;
 		v1 = (v0) + .25f; \
 	} while (0)
 
-const char* g_texnames[] = {"crate", "player", "cloud"};
+const char* g_texnames[] = {"crate", "player", "wallfloor", "cloud"};
 unsigned g_tex[NUM_TEX];
 
 #define NUM_MAPS (20)
@@ -223,6 +224,8 @@ HSTREAM g_musicStream = 0;
 
 void playMusic(const char* path)
 {
+	(void) path;
+
 #if _WIN32
 	char data_path[PATH_NAME_SIZE] = DATA_DIR;
 	strcat(data_path, path);
@@ -1058,17 +1061,13 @@ ignore_mouse_input:
 		for (int x = 0; x < g_world.nx; ++x)
 		{
 			const int tile = worldTile(x, y);
-			unsigned cc = (unsigned) (0x20 * ((float) rand() / RAND_MAX));
-			unsigned kk = 0x008f6f6f;
 
-			if (tile == TILE_WALL)
-				kk = 0x002f3f4f;
+			if (tile == TILE_FLOOR)
+				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLFLOOR, .5f, 0.f, 1.f, .5f);
+			else if (tile == TILE_WALL)
+				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLFLOOR, 0.f, 0.f, .5f, .5f);
 			else if (tile == TILE_TARGET)
-				kk = 0x007fcf7f;
-			else if (tile == TILE_VOID)
-				continue;
-
-			quad(posX(x, ss), posY(y, ss), ss, kk + cc);
+				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLFLOOR, .5f, .5f, 1.f, 1.f);
 		}
 	}
 
@@ -1083,32 +1082,35 @@ ignore_mouse_input:
 		const int y = g_world.crates[i].y;
 		float xx = posX(x, ss);
 		float yy = posY(y, ss);
+		float sm = 1.f;
 
 		if (p->move && p->x - m->dx == x && p->y - m->dy == y)
 		{
 			xx += ix;
 			yy += iy;
 		}
+		else if (m->x0 == x && m->y0 == y && buttonHeld(0))
+			sm = 1.2f;
 
 		const float t = gp->intro + (float) rand() / RAND_MAX * M_PI;
 		const float w = min(t / (M_PI * 4.5f), 1.f);
 		const float ss2 = ss * .5f + ss * (cosf(t) + 1.f) * .5f;
 		const float ss3 = w * ss + (1.f - w) * ss2;
-		sprite(xx, yy, ss3, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
+		sprite(xx, yy, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
 	}
 
-	if (buttonHeld(0))
+	if (buttonHeld(0) || p->path >= 0)
 	{
-		const int x0 = min(m->x0 + 1, m->x1), x1 = max(m->x0 - 1, m->x1);
-		const int y0 = min(m->y0 + 1, m->y1), y1 = max(m->y0 - 1, m->y1);
+		const int x0 = min(m->x0, m->x1), x1 = max(m->x0, m->x1);
+		const int y0 = min(m->y0, m->y1), y1 = max(m->y0, m->y1);
 
-		if ((x0 == x1 && y0 != y1) || (x0 != y1 && y0 == y1))
+		if ((x0 == x1 && y0 != y1) || (x0 != x1 && y0 == y1))
 		{
-			for (int i = x0; i <= x1 && worldTile(x0, y0) == TILE_FLOOR; ++i)
-				quad(posX(i, ss), posY(y0, ss), ss, 0x007fcf7f);
+			for (int i = x0; i <= x1; ++i)
+				quad(posX(i, ss), posY(y0, ss), ss * .25f, ~0);
 
-			for (int i = y0; i <= y1 && worldTile(x0, y0) == TILE_FLOOR; ++i)
-				quad(posX(x0, ss), posY(i, ss), ss, 0x007fcf7f);
+			for (int i = y0; i <= y1; ++i)
+				quad(posX(x0, ss), posY(i, ss), ss * .25f, ~0);
 		}
 	}
 
@@ -1380,8 +1382,6 @@ void onDisplay()
 
 void onFile(char* path)
 {
-	FILE* fd;
-	long size;
 	char* ext;
 	char* data;
 	int n;
