@@ -153,8 +153,13 @@ char* g_textEnd;
 #define TEX_CRATE (0)
 #define TEX_PLAYER (1)
 #define TEX_WALLFLOOR (2)
-#define TEX_CLOUD (3)
-#define NUM_TEX (4)
+#define TEX_WALLVARS (3)
+#define TEX_FLOOR_G (4)
+#define TEX_FLOOR_P (5)
+#define TEX_TARGET_G (6)
+#define TEX_TARGET_P (7)
+#define TEX_CLOUD (8)
+#define NUM_TEX (9)
 
 #define texUvPlayer(u0,v0,u1,v1,su,sv) \
 	do { \
@@ -164,7 +169,18 @@ char* g_textEnd;
 		v1 = (v0) + .25f; \
 	} while (0)
 
-const char* g_texnames[] = {"crate", "player", "wallfloor", "cloud"};
+const char* g_texnames[] = {
+	"crate",
+	"player",
+	"wallfloor",
+	"wall-vars",
+	"floor-g",
+	"floor-p",
+	"target-g",
+	"target-p",
+	"cloud"
+};
+
 unsigned g_tex[NUM_TEX];
 
 #define NUM_MAPS (20)
@@ -1054,20 +1070,28 @@ ignore_mouse_input:
 		}
 	}
 
-	srand(15);
+	srand(1573 + g_current_map * 1731);
+
+	const int ft = (int) (rand() / (float) RAND_MAX / .5f);
+	const float wu = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
+	const float wv = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
+	const float fx = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
+	const float fy = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 
 	for (int y = 0; y < g_world.ny; ++y)
 	{
 		for (int x = 0; x < g_world.nx; ++x)
 		{
+			const float fu = fx + floorf(min(abs(tanf(x * .25f)), 1.f) * (rand() / (float) RAND_MAX / .5f)) * .25f;
+			const float fv = fy + floorf(min(abs(tanf(y * .25f)), 1.f) * (rand() / (float) RAND_MAX / .5f)) * .25f;
 			const int tile = worldTile(x, y);
 
 			if (tile == TILE_FLOOR)
-				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLFLOOR, .5f, 0.f, 1.f, .5f);
+				sprite(posX(x, ss), posY(y, ss), ss, TEX_FLOOR_G + ft, fu, fv, fu + .25f, fv + .25f);
 			else if (tile == TILE_WALL)
-				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLFLOOR, 0.f, 0.f, .5f, .5f);
+				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLVARS, wu, wv, wu + .5f, wv + .5f);
 			else if (tile == TILE_TARGET)
-				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLFLOOR, .5f, .5f, 1.f, 1.f);
+				sprite(posX(x, ss), posY(y, ss), ss, TEX_TARGET_G + ft, 0.f, 0.f, 1.f, 1.f);
 		}
 	}
 
@@ -1405,7 +1429,6 @@ void onFile(char* path)
 			return;
 
 		data = load_file(path, &n);
-
 		assert(n == w * h * 4);
 
 		glGenTextures(1, &g_tex[i]);
