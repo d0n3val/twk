@@ -150,16 +150,20 @@ char* g_textEnd;
 #define SAVE_GAME_VERSION (2)
 #define SAVE_GAME_PATH ("data/save.bin")
 
-#define TEX_CRATE (0)
-#define TEX_PLAYER (1)
-#define TEX_WALLFLOOR (2)
-#define TEX_WALLVARS (3)
-#define TEX_FLOOR_G (4)
-#define TEX_FLOOR_P (5)
-#define TEX_TARGET_G (6)
-#define TEX_TARGET_P (7)
-#define TEX_CLOUD (8)
-#define NUM_TEX (9)
+enum
+{
+	TEX_CRATE,
+	TEX_PLAYER,
+	TEX_WALLFLOOR,
+	TEX_WALLVARS,
+	TEX_FLOORVARS,
+	TEX_FLOOR_G,
+	TEX_FLOOR_P,
+	TEX_TARGET_G,
+	TEX_TARGET_P,
+	TEX_CLOUD,
+	NUM_TEX
+};
 
 #define texUvPlayer(u0,v0,u1,v1,su,sv) \
 	do { \
@@ -174,6 +178,7 @@ const char* g_texnames[] = {
 	"player",
 	"wallfloor",
 	"wall-vars",
+	"floor-vars",
 	"floor-g",
 	"floor-p",
 	"target-g",
@@ -1070,28 +1075,25 @@ ignore_mouse_input:
 		}
 	}
 
-	srand(1573 + g_current_map * 1731);
+	srand(13 + g_current_map * 3);
 
-	const int ft = (int) (rand() / (float) RAND_MAX / .5f);
-	const float wu = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
-	const float wv = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
-	const float fx = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
-	const float fy = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
+	const float vx = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
+	const float vy = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 
 	for (int y = 0; y < g_world.ny; ++y)
 	{
 		for (int x = 0; x < g_world.nx; ++x)
 		{
-			const float fu = fx + floorf(min(abs(tanf(x * .25f)), 1.f) * (rand() / (float) RAND_MAX / .5f)) * .25f;
-			const float fv = fy + floorf(min(abs(tanf(y * .25f)), 1.f) * (rand() / (float) RAND_MAX / .5f)) * .25f;
+			const float vu = vx + floorf((.5f + .05f * sinf(x * .3f)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
+			const float vv = vy + floorf((.5f + .05f * cosf(x * .9f)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
 			const int tile = worldTile(x, y);
 
 			if (tile == TILE_FLOOR)
-				sprite(posX(x, ss), posY(y, ss), ss, TEX_FLOOR_G + ft, fu, fv, fu + .25f, fv + .25f);
+				sprite(posX(x, ss), posY(y, ss), ss, TEX_FLOORVARS, vu, vv, vu + .25f, vv + .25f);
 			else if (tile == TILE_WALL)
-				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLVARS, wu, wv, wu + .5f, wv + .5f);
+				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLVARS, vu, vv, vu + .25f, vv + .25f);
 			else if (tile == TILE_TARGET)
-				sprite(posX(x, ss), posY(y, ss), ss, TEX_TARGET_G + ft, 0.f, 0.f, 1.f, 1.f);
+				sprite(posX(x, ss), posY(y, ss), ss, TEX_TARGET_G, 0.f, 0.f, 1.f, 1.f);
 		}
 	}
 
@@ -1103,10 +1105,10 @@ ignore_mouse_input:
 		if ((x0 == x1 && y0 != y1) || (x0 != x1 && y0 == y1))
 		{
 			for (int i = x0; i <= x1; ++i)
-				quad(posX(i, ss), posY(y0, ss), ss * .25f, ~0);
+				quad(posX(i, ss), posY(y0, ss), ss * .25f, 0);
 
 			for (int i = y0; i <= y1; ++i)
-				quad(posX(x0, ss), posY(i, ss), ss * .25f, ~0);
+				quad(posX(x0, ss), posY(i, ss), ss * .25f, 0);
 		}
 	}
 
