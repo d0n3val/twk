@@ -92,8 +92,6 @@
 #define buttonUp(b) (!(g_buttons[0] & (1 << (b))) && (g_buttons[1] & (1 << (b))))
 #define buttonHeld(b) (g_buttons[0] & (1 << (b)))
 
-#define DATA_DIR "data/"
-
 unsigned long long g_clock;
 double g_period;
 float g_elapse;
@@ -147,8 +145,7 @@ struct Text
 char g_textBuffer[2048];
 char* g_textEnd;
 
-#define SAVE_GAME_VERSION (2)
-#define SAVE_GAME_PATH ("data/save.bin")
+///////////////////////////////////////////////////////////////////////////////
 
 enum
 {
@@ -188,8 +185,27 @@ const char* g_texnames[] = {
 
 unsigned g_tex[NUM_TEX];
 
-#define NUM_MAPS (20)
+///////////////////////////////////////////////////////////////////////////////
+
 #define PATH_NAME_SIZE (64)
+#define DATA_DIR ("data/")
+
+struct MapInfo
+{
+	char name[80];
+	char file[PATH_NAME_SIZE];
+	char music[PATH_NAME_SIZE];
+	char bg[PATH_NAME_SIZE];
+	int seed;
+	int par;
+};
+
+#define MAX_MAPS 20
+
+struct MapInfo g_map_progression[MAX_MAPS];
+int g_current_map = 0;
+
+///////////////////////////////////////////////////////////////////////////////
 
 #define TILE_VOID ('!')
 #define TILE_WALL ('X')
@@ -218,28 +234,36 @@ struct World
 
 struct World g_world;
 
-struct MapInfo
+int worldTile(int x, int y)
 {
-	char name[80];
-	char file[PATH_NAME_SIZE];
-	char music[PATH_NAME_SIZE];
-	char bg[PATH_NAME_SIZE];
-	int seed;
-	int par;
-};
+	return x >= 0 && y >= 0 ? g_world.tiles[y * g_world.nx + x] : TILE_UNKNOWN;
+}
 
-#define MAX_MAPS 20
+struct Crate* worldCrate(int x, int y)
+{
+	for (int i = 0; i < g_world.ncrates; ++i)
+		if (g_world.crates[i].x == x && g_world.crates[i].y == y)
+			return &g_world.crates[i];
 
-struct MapInfo g_map_progression[MAX_MAPS];
-int g_current_map = 0;
+	return NULL;
+}
 
-#define CFG_HEADER ("map")
-#define CFG_NAME ("name")
-#define CFG_MUSIC ("music")
-#define CFG_BG ("bg")
-#define CFG_FILE ("file")
-#define CFG_SEED ("seed")
-#define CFG_PAR ("par")
+///////////////////////////////////////////////////////////////////////////////
+
+#define SAVE_GAME_VERSION (2)
+#define SAVE_GAME_PATH ("data/save.bin")
+
+void gprintf(float x, float y, unsigned c, const char* fmt, ...);
+void quad(float x, float y, float s, unsigned c);
+void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1);
+
+char* loadFile(const char *path, int *readed);
+void loadMap(const char* path);
+void saveGame();
+void loadGame();
+void loadConfig(const char* path);
+
+///////////////////////////////////////////////////////////////////////////////
 
 #if _WIN32
 HSTREAM g_musicStream = 0;
@@ -266,24 +290,7 @@ void playMusic(const char* path)
 #endif
 }
 
-
-int worldTile(int x, int y)
-{
-	return x >= 0 && y >= 0 ? g_world.tiles[y * g_world.nx + x] : TILE_UNKNOWN;
-}
-
-struct Crate* worldCrate(int x, int y)
-{
-	for (int i = 0; i < g_world.ncrates; ++i)
-		if (g_world.crates[i].x == x && g_world.crates[i].y == y)
-			return &g_world.crates[i];
-
-	return NULL;
-}
-
-void gprintf(float x, float y, unsigned c, const char* fmt, ...);
-void quad(float x, float y, float s, unsigned c);
-void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1);
+///////////////////////////////////////////////////////////////////////////////
 
 struct Spring
 {
@@ -666,162 +673,6 @@ float posY(int y, int s) { return g_height * .5f - s * (g_world.ny * .5f) + y * 
 int unposX(float x, int s) { return (x + s *.5f - (g_width * .5f - s * (g_world.nx * .5f))) / s; }
 int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world.ny * .5f))) / s; }
 
-char* load_file(const char *path, int *readed)
-{
-	FILE* fd;
-	long size;
-	char* data;
-
-	printf("Loading [%s]\n", path);
-	fd = fopen(path, "rb");
-	fseek(fd, 0, SEEK_END);
-	size = ftell(fd);
-	rewind(fd);
-	data = (char*) malloc(size);
-	*readed = fread(data, 1, size, fd);
-	fclose(fd);
-
-	return data;
-}
-
-void load_map(const char* path)
-{
-		int n = 0;
-		char data_path[PATH_NAME_SIZE] = DATA_DIR;
-		char* data = load_file(strcat(data_path, path), &n);
-
-		memset(&g_world, 0, sizeof(g_world));
-
-		struct Crate* crate = g_world.crates;
-		char* dst = g_world.tiles;
-		char* src = data;
-
-		for (int i = 0, x = 0; i < n; ++i)
-		{
-			const char c = *src++;
-
-			if (c == TILE_VOID || c == TILE_WALL || c == TILE_FLOOR || c == TILE_TARGET)
-				++x, *dst++ = c;
-			else if (c == TILE_CRATE)
-				crate->x = x++, (crate++)->y = g_world.ny, *dst++ = TILE_FLOOR;
-			else if (c == TILE_CRATE_TARGET)
-				crate->x = x++, (crate++)->y = g_world.ny, *dst++ = TILE_TARGET;
-			else if (c == TILE_START)
-				g_world.startx = x++, g_world.starty = g_world.ny, *dst++ = TILE_FLOOR;
-			else if (c == TILE_START_TARGET)
-				g_world.startx = x++, g_world.starty = g_world.ny, *dst++ = TILE_TARGET;
-			else if (c == '\n')
-				x = 0, ++g_world.ny;
-
-			g_world.nx = max(g_world.nx, x);
-		}
-
-		g_world.ncrates = crate - g_world.crates;
-		free(data);
-}
-
-void saveGame()
-{
-	FILE* fd;
-	int ver = SAVE_GAME_VERSION;
-
-	if ((fd = fopen(SAVE_GAME_PATH, "wb")) != NULL)
-	{
-		fwrite(&ver, sizeof(ver), 1, fd);
-		fwrite(&g_current_map, sizeof(g_current_map), 1, fd);
-		fwrite(&g_world, sizeof(g_world), 1, fd);
-		fwrite(&g_gamePlay, sizeof(g_gamePlay), 1, fd);
-		fclose(fd);
-	}
-	else fprintf(stderr, "Failed to save game state\n");
-}
-
-void loadGame()
-{
-	FILE* fd;
-	int ver = -1;
-
-	if ((fd = fopen(SAVE_GAME_PATH, "rb")) != NULL)
-	{
-		if (fread(&ver, sizeof(ver), 1, fd) != 1)
-			fprintf(stderr, "Failed to read version\n");
-
-		if (ver == SAVE_GAME_VERSION)
-		{
-			if (fread(&g_current_map, sizeof(g_current_map), 1, fd) != 1)
-				fprintf(stderr, "Failed to read map id\n");
-
-			if (fread(&g_world, sizeof(g_world), 1, fd) != 1)
-				fprintf(stderr, "Failed to read world\n");
-
-			if (fread(&g_gamePlay, sizeof(g_gamePlay), 1, fd) != 1)
-				fprintf(stderr, "Failed to read gameplay\n");
-		}
-		else fprintf(stderr, "Version mismatch in game state\n");
-
-		fclose(fd);
-	}
-	else fprintf(stderr, "Failed to load game state\n");
-}
-
-void load_config(const char* path)
-{
-	int n = 0;
-	char* data = load_file(path, &n);
-	int map = -1; 
-
-	for (int i = 0; i < n; ++i)
-		if (data[i] == '\n' || data[i] == '\r')
-			data[i] = 0;
-
-	for (int i = 0; i < n; ++i)
-	{
-		if (strncmp(&data[i], CFG_HEADER, sizeof(CFG_HEADER) - 1) == 0)
-		{
-			++map;
-			i += sizeof(CFG_HEADER) - 1;
-		}
-		else if (strncmp(&data[i], CFG_FILE, sizeof(CFG_FILE) - 1) == 0)
-		{
-			i += sizeof(CFG_FILE);
-			strncpy(g_map_progression[map].file, &data[i], PATH_NAME_SIZE);
-			i += strlen(g_map_progression[map].file);
-		}
-		else if (strncmp(&data[i], CFG_NAME, sizeof(CFG_NAME) - 1) == 0)
-		{
-			i += sizeof(CFG_NAME);
-			strncpy(g_map_progression[map].name, &data[i], PATH_NAME_SIZE);
-			i += strlen(g_map_progression[map].name);
-		}
-		else if (strncmp(&data[i], CFG_MUSIC, sizeof(CFG_MUSIC) - 1) == 0)
-		{
-			i += sizeof(CFG_MUSIC);
-			strncpy(g_map_progression[map].music, &data[i], PATH_NAME_SIZE);
-			i += strlen(g_map_progression[map].music);
-		}				
-		else if (strncmp(&data[i], CFG_BG, sizeof(CFG_BG) - 1) == 0)
-		{
-			i += sizeof(CFG_BG);
-			strncpy(g_map_progression[map].bg, &data[i], PATH_NAME_SIZE);
-			i += strlen(g_map_progression[map].bg);
-		}
-		else if (strncmp(&data[i], CFG_SEED, sizeof(CFG_SEED) - 1) == 0)
-		{
-			i += sizeof(CFG_SEED);
-			g_map_progression[map].seed = atoi(&data[i]);
-		}
-		else if (strncmp(&data[i], CFG_PAR, sizeof(CFG_PAR) - 1) == 0)
-		{
-			i += sizeof(CFG_PAR);
-			g_map_progression[map].par = atoi(&data[i]);
-		}
-	}
-
-	free(data);
-
-	g_map_progression[++map].par = -1; // watermark
-}
-
 int isTargetTile(int x, int y)
 {
 	int t = worldTile(x, y);
@@ -854,7 +705,7 @@ void gamePlay(float elapse, unsigned* stage)
 
 		if (!g_gameStart.loadGameOnStart)
 		{
-			load_map(g_map_progression[g_current_map].file);
+			loadMap(g_map_progression[g_current_map].file);
 			playMusic(g_map_progression[g_current_map].music);
 		}
 
@@ -1408,6 +1259,173 @@ void onDisplay()
 	glutPostWindowRedisplay(g_window);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+char* loadFile(const char *path, int *readed)
+{
+	FILE* fd;
+	long size;
+	char* data;
+
+	printf("Loading [%s]\n", path);
+	fd = fopen(path, "rb");
+	fseek(fd, 0, SEEK_END);
+	size = ftell(fd);
+	rewind(fd);
+	data = (char*) malloc(size);
+	*readed = fread(data, 1, size, fd);
+	fclose(fd);
+
+	return data;
+}
+
+void loadMap(const char* path)
+{
+		int n = 0;
+		char data_path[PATH_NAME_SIZE] = DATA_DIR;
+		char* data = loadFile(strcat(data_path, path), &n);
+
+		memset(&g_world, 0, sizeof(g_world));
+
+		struct Crate* crate = g_world.crates;
+		char* dst = g_world.tiles;
+		char* src = data;
+
+		for (int i = 0, x = 0; i < n; ++i)
+		{
+			const char c = *src++;
+
+			if (c == TILE_VOID || c == TILE_WALL || c == TILE_FLOOR || c == TILE_TARGET)
+				++x, *dst++ = c;
+			else if (c == TILE_CRATE)
+				crate->x = x++, (crate++)->y = g_world.ny, *dst++ = TILE_FLOOR;
+			else if (c == TILE_CRATE_TARGET)
+				crate->x = x++, (crate++)->y = g_world.ny, *dst++ = TILE_TARGET;
+			else if (c == TILE_START)
+				g_world.startx = x++, g_world.starty = g_world.ny, *dst++ = TILE_FLOOR;
+			else if (c == TILE_START_TARGET)
+				g_world.startx = x++, g_world.starty = g_world.ny, *dst++ = TILE_TARGET;
+			else if (c == '\n')
+				x = 0, ++g_world.ny;
+
+			g_world.nx = max(g_world.nx, x);
+		}
+
+		g_world.ncrates = crate - g_world.crates;
+		free(data);
+}
+
+void saveGame()
+{
+	FILE* fd;
+	int ver = SAVE_GAME_VERSION;
+
+	if ((fd = fopen(SAVE_GAME_PATH, "wb")) != NULL)
+	{
+		fwrite(&ver, sizeof(ver), 1, fd);
+		fwrite(&g_current_map, sizeof(g_current_map), 1, fd);
+		fwrite(&g_world, sizeof(g_world), 1, fd);
+		fwrite(&g_gamePlay, sizeof(g_gamePlay), 1, fd);
+		fclose(fd);
+	}
+	else fprintf(stderr, "Failed to save game state\n");
+}
+
+void loadGame()
+{
+	FILE* fd;
+	int ver = -1;
+
+	if ((fd = fopen(SAVE_GAME_PATH, "rb")) != NULL)
+	{
+		if (fread(&ver, sizeof(ver), 1, fd) != 1)
+			fprintf(stderr, "Failed to read version\n");
+
+		if (ver == SAVE_GAME_VERSION)
+		{
+			if (fread(&g_current_map, sizeof(g_current_map), 1, fd) != 1)
+				fprintf(stderr, "Failed to read map id\n");
+
+			if (fread(&g_world, sizeof(g_world), 1, fd) != 1)
+				fprintf(stderr, "Failed to read world\n");
+
+			if (fread(&g_gamePlay, sizeof(g_gamePlay), 1, fd) != 1)
+				fprintf(stderr, "Failed to read gameplay\n");
+		}
+		else fprintf(stderr, "Version mismatch in game state\n");
+
+		fclose(fd);
+	}
+	else fprintf(stderr, "Failed to load game state\n");
+}
+
+#define CFG_HEADER ("map")
+#define CFG_NAME ("name")
+#define CFG_MUSIC ("music")
+#define CFG_BG ("bg")
+#define CFG_FILE ("file")
+#define CFG_SEED ("seed")
+#define CFG_PAR ("par")
+
+void loadConfig(const char* path)
+{
+	int n = 0;
+	char* data = loadFile(path, &n);
+	int map = -1; 
+
+	for (int i = 0; i < n; ++i)
+		if (data[i] == '\n' || data[i] == '\r')
+			data[i] = 0;
+
+	for (int i = 0; i < n; ++i)
+	{
+		if (strncmp(&data[i], CFG_HEADER, sizeof(CFG_HEADER) - 1) == 0)
+		{
+			++map;
+			i += sizeof(CFG_HEADER) - 1;
+		}
+		else if (strncmp(&data[i], CFG_FILE, sizeof(CFG_FILE) - 1) == 0)
+		{
+			i += sizeof(CFG_FILE);
+			strncpy(g_map_progression[map].file, &data[i], PATH_NAME_SIZE);
+			i += strlen(g_map_progression[map].file);
+		}
+		else if (strncmp(&data[i], CFG_NAME, sizeof(CFG_NAME) - 1) == 0)
+		{
+			i += sizeof(CFG_NAME);
+			strncpy(g_map_progression[map].name, &data[i], PATH_NAME_SIZE);
+			i += strlen(g_map_progression[map].name);
+		}
+		else if (strncmp(&data[i], CFG_MUSIC, sizeof(CFG_MUSIC) - 1) == 0)
+		{
+			i += sizeof(CFG_MUSIC);
+			strncpy(g_map_progression[map].music, &data[i], PATH_NAME_SIZE);
+			i += strlen(g_map_progression[map].music);
+		}				
+		else if (strncmp(&data[i], CFG_BG, sizeof(CFG_BG) - 1) == 0)
+		{
+			i += sizeof(CFG_BG);
+			strncpy(g_map_progression[map].bg, &data[i], PATH_NAME_SIZE);
+			i += strlen(g_map_progression[map].bg);
+		}
+		else if (strncmp(&data[i], CFG_SEED, sizeof(CFG_SEED) - 1) == 0)
+		{
+			i += sizeof(CFG_SEED);
+			g_map_progression[map].seed = atoi(&data[i]);
+		}
+		else if (strncmp(&data[i], CFG_PAR, sizeof(CFG_PAR) - 1) == 0)
+		{
+			i += sizeof(CFG_PAR);
+			g_map_progression[map].par = atoi(&data[i]);
+		}
+	}
+
+	free(data);
+
+	g_map_progression[++map].par = -1; // watermark
+}
+
 void onFile(char* path)
 {
 	char* ext;
@@ -1432,7 +1450,7 @@ void onFile(char* path)
 		if (i == NUM_TEX)
 			return;
 
-		data = load_file(path, &n);
+		data = loadFile(path, &n);
 		assert(n == w * h * 4);
 
 		glGenTextures(1, &g_tex[i]);
@@ -1442,9 +1460,12 @@ void onFile(char* path)
 	}
 	else if (strcmp(ext, ".cfg") == 0)
 	{
-		load_config(path);
+		loadConfig(path);
 	}
 }
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 void init(int* argc, char* argv[])
 {
