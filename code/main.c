@@ -224,6 +224,7 @@ struct MapInfo
 	char file[PATH_NAME_SIZE];
 	char music[PATH_NAME_SIZE];
 	char bg[PATH_NAME_SIZE];
+	int seed;
 	int par;
 };
 
@@ -232,12 +233,13 @@ struct MapInfo
 struct MapInfo g_map_progression[MAX_MAPS];
 int g_current_map = 0;
 
-#define CFG_HEADER "map"
-#define CFG_NAME "name"
-#define CFG_MUSIC "music"
-#define CFG_BG "bg"
-#define CFG_FILE "file"
-#define CFG_PAR "par"
+#define CFG_HEADER ("map")
+#define CFG_NAME ("name")
+#define CFG_MUSIC ("music")
+#define CFG_BG ("bg")
+#define CFG_FILE ("file")
+#define CFG_SEED ("seed")
+#define CFG_PAR ("par")
 
 #if _WIN32
 HSTREAM g_musicStream = 0;
@@ -769,56 +771,49 @@ void load_config(const char* path)
 	int map = -1; 
 
 	for (int i = 0; i < n; ++i)
-	{
-		if(data[i] == '\n' || data[i] == '\r') data[i] = 0;
-	}
+		if (data[i] == '\n' || data[i] == '\r')
+			data[i] = 0;
 
 	for (int i = 0; i < n; ++i)
 	{
-		if (strncmp(&data[i], CFG_HEADER, strlen(CFG_HEADER)) == 0)
+		if (strncmp(&data[i], CFG_HEADER, sizeof(CFG_HEADER) - 1) == 0)
 		{
 			++map;
-			i += strlen(CFG_HEADER);
-			continue;
+			i += sizeof(CFG_HEADER) - 1;
 		}
-
-		if (strncmp(&data[i], CFG_FILE, strlen(CFG_FILE)) == 0)
+		else if (strncmp(&data[i], CFG_FILE, sizeof(CFG_FILE) - 1) == 0)
 		{
-			i += strlen(CFG_FILE) + 1;
+			i += sizeof(CFG_FILE);
 			strncpy(g_map_progression[map].file, &data[i], PATH_NAME_SIZE);
 			i += strlen(g_map_progression[map].file);
-			continue;
 		}
-
-		if (strncmp(&data[i], CFG_NAME, strlen(CFG_NAME)) == 0)
+		else if (strncmp(&data[i], CFG_NAME, sizeof(CFG_NAME) - 1) == 0)
 		{
-			i += strlen(CFG_NAME) + 1;
+			i += sizeof(CFG_NAME);
 			strncpy(g_map_progression[map].name, &data[i], PATH_NAME_SIZE);
 			i += strlen(g_map_progression[map].name);
-			continue;
 		}
-
-		if (strncmp(&data[i], CFG_MUSIC, strlen(CFG_MUSIC)) == 0)
+		else if (strncmp(&data[i], CFG_MUSIC, sizeof(CFG_MUSIC) - 1) == 0)
 		{
-			i += strlen(CFG_MUSIC) + 1;
+			i += sizeof(CFG_MUSIC);
 			strncpy(g_map_progression[map].music, &data[i], PATH_NAME_SIZE);
 			i += strlen(g_map_progression[map].music);
-			continue;
 		}				
-
-		if (strncmp(&data[i], CFG_BG, strlen(CFG_BG)) == 0)
+		else if (strncmp(&data[i], CFG_BG, sizeof(CFG_BG) - 1) == 0)
 		{
-			i += strlen(CFG_BG) + 1;
+			i += sizeof(CFG_BG);
 			strncpy(g_map_progression[map].bg, &data[i], PATH_NAME_SIZE);
 			i += strlen(g_map_progression[map].bg);
-			continue;
 		}
-
-		if (strncmp(&data[i], CFG_PAR, strlen(CFG_PAR)) == 0)
+		else if (strncmp(&data[i], CFG_SEED, sizeof(CFG_SEED) - 1) == 0)
 		{
-			i += strlen(CFG_PAR) + 1;
+			i += sizeof(CFG_SEED);
+			g_map_progression[map].seed = atoi(&data[i]);
+		}
+		else if (strncmp(&data[i], CFG_PAR, sizeof(CFG_PAR) - 1) == 0)
+		{
+			i += sizeof(CFG_PAR);
 			g_map_progression[map].par = atoi(&data[i]);
-			continue;
 		}
 	}
 
@@ -886,7 +881,7 @@ void gamePlay(float elapse, unsigned* stage)
 		}
 		if (buttonDown(0))
 		{
-			if(g_map_progression[++g_current_map].par < 0)
+			if (g_map_progression[++g_current_map].par < 0)
 				--(*stage);
 			else
 				*stage = ~0;
@@ -1075,7 +1070,14 @@ ignore_mouse_input:
 		}
 	}
 
-	srand(13 + g_current_map * 3);
+	if (keyDown('0'))
+	{
+		srand(time(0) ^ g_map_progression[g_current_map].seed);
+		g_map_progression[g_current_map].seed = (int) (rand() / (float) RAND_MAX * 3333.f);
+	}
+
+	srand(g_map_progression[g_current_map].seed);
+	gprintf(.9f, .07f, 0x00ff00ff, "SEED %d", g_map_progression[g_current_map].seed);
 
 	const float vx = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 	const float vy = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
@@ -1084,8 +1086,8 @@ ignore_mouse_input:
 	{
 		for (int x = 0; x < g_world.nx; ++x)
 		{
-			const float vu = vx + floorf((.5f + .05f * sinf(x * .3f)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
-			const float vv = vy + floorf((.5f + .05f * cosf(x * .9f)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
+			const float vu = vx + floorf((.3f + .3f * sinf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
+			const float vv = vy + floorf((.5f + .2f * cosf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
 			const int tile = worldTile(x, y);
 
 			if (tile == TILE_FLOOR)
