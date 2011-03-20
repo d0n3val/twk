@@ -2,6 +2,7 @@
 #if _WIN32
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>
+# include <ctime> 
 # include "bass/bass.h"
 # pragma comment(lib, "bass/bass.lib")
 #elif __linux__
@@ -217,6 +218,8 @@ int g_current_map = 0;
 #define TILE_TARGET ('*')
 #define TILE_UNKNOWN ('?')
 
+#define MAX_CRATES 64
+
 struct Crate
 {
 	int x, y;
@@ -225,7 +228,7 @@ struct Crate
 struct World
 {
 	int ncrates;
-	struct Crate crates[64];
+	struct Crate crates[MAX_CRATES];
 
 	int startx, starty;
 	int nx, ny;
@@ -566,6 +569,12 @@ struct Timer
 	int seconds;
 };
 
+struct UndoStep
+{
+	struct Crate crates[MAX_CRATES];
+	int playerx, playery;
+};
+
 struct GamePlay
 {
 	int init;
@@ -577,6 +586,8 @@ struct GamePlay
 	struct Move move;
 	int npath;
 	struct PathNode path[128];
+	int stepSaved;
+	struct UndoStep steps[64];
 } g_gamePlay;
 
 int pathFind(int startx, int starty, int goalx, int goaly)
@@ -702,6 +713,7 @@ void gamePlay(float elapse, unsigned* stage)
 		gp->init = 1;
 		gp->finished = 0;
 		gp->intro = -M_PI;
+		gp->stepSaved = 0;
 
 		if (!g_gameStart.loadGameOnStart)
 		{
@@ -762,10 +774,28 @@ void gamePlay(float elapse, unsigned* stage)
 		--(*stage);
 	}
 	else if (keyDown('r'))
+	{
 		*stage = ~0;
+	}
 
 	if (p->path >= 0 || p->move)
 		goto ignore_mouse_input;
+
+	if (keyDown('u') && gp->moves > 0)
+	{
+		--gp->moves;
+		p->x = gp->steps[gp->moves].playerx;
+		p->y = gp->steps[gp->moves].playery;
+		memcpy(g_world.crates, gp->steps[gp->moves].crates, sizeof(struct Crate) * g_world.ncrates);
+	}
+
+	if (gp->stepSaved == 0)
+	{
+		gp->stepSaved = 1;
+		gp->steps[gp->moves].playerx = p->x;
+		gp->steps[gp->moves].playery = p->y;
+		memcpy(gp->steps[gp->moves].crates, g_world.crates, sizeof(struct Crate) * g_world.ncrates);
+	}
 
 	const int mx = unposX(g_mousex, ss);
 	const int my = unposY(g_mousey, ss);
@@ -910,6 +940,7 @@ ignore_mouse_input:
 				p->iy = p->y;
 				p->move = 0;
 				++gp->moves;
+				gp->stepSaved = 0;
 
 				m->x0 = -1;
 				m->y0 = -1;
@@ -1005,7 +1036,7 @@ ignore_mouse_input:
 	gprintf(.02f, .05f, 0x00ffffff, "LEVEL: %s", g_map_progression[g_current_map].name);
 	gprintf(.02f, .07f, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
 	gprintf(.02f, .09f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
-	gprintf(.02f, .95f, 0x00ffffff, "[P]AUSE  [R]ESTART");
+	gprintf(.02f, .95f, 0x00ffffff, "[U]NDO [P]AUSE  [R]ESTART");
 
 	if (winConditions == 1) 
 	{
