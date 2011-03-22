@@ -1,6 +1,10 @@
-# Compiles and creates a build .zip file
+:: Compiles and creates a build .zip file
 
+if not defined INCLUDE (
 call set_dirs.bat
+) else (
+call make.bat
+)
 
 mkdir twk
 xcopy *.dll twk
