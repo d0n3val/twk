@@ -271,10 +271,14 @@ void loadConfig(const char* path);
 #if _WIN32
 HSTREAM g_musicStream = 0;
 #endif
+unsigned g_mute;
 
 void playMusic(const char* path)
 {
 	(void) path;
+
+	if (g_mute)
+		return;
 
 #if _WIN32
 	char data_path[PATH_NAME_SIZE] = DATA_DIR;
@@ -1567,6 +1571,12 @@ void end()
 
 int main(int argc, char* argv[])
 {
+	for (int i = 0; i < argc; ++i)
+	{
+		if (!strcmp(argv[i], "-mute"))
+			g_mute = 1;
+	}
+
 	init(&argc, argv);
 	atexit(&end);
 
