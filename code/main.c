@@ -163,12 +163,28 @@ enum
 	NUM_TEX
 };
 
-#define texUvPlayer(u0,v0,u1,v1,su,sv) \
+#define texUvPlayer_up(u0,v0,u1,v1,s) \
 	do { \
-		u0 = floorf((su) / .25f) * .25f; \
-		u1 = (u0) + .25f; \
-		v0 = floorf((sv) / .25f) * .25f; \
-		v1 = (v0) + .25f; \
+		u0 = 0.f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
+		v0 = 0.f; v1 = .125f; \
+	} while (0)
+
+#define texUvPlayer_right(u0,v0,u1,v1,s) \
+	do { \
+		u0 = .5f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
+		v0 = 0.f; v1 = .125f; \
+	} while (0)
+
+#define texUvPlayer_down(u0,v0,u1,v1,s) \
+	do { \
+		u0 = 0.f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
+		v0 = .125f; v1 = .25f; \
+	} while (0)
+
+#define texUvPlayer_left(u0,v0,u1,v1,s) \
+	do { \
+		u0 = .5f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
+		v0 = .125f; v1 = .25f; \
 	} while (0)
 
 const char* g_texnames[] = {
@@ -509,7 +525,8 @@ void gameStart(float elapse, unsigned* stage)
 	}
 
 	float u0, v0, u1, v1;
-	texUvPlayer(u0, v0, u1, v1, .25f, .5f);
+	u0 = .5f, u1 = u0 + .125f;
+	v0 = .375f, v1 = v0 + .125f;
 	sprite(gs->px, gs->py, 128.f, TEX_PLAYER, u0, v0, u1, v1);
 
 	static const unsigned colors[] = {0x0000ff00, 0x00ffffff};
@@ -1028,13 +1045,26 @@ ignore_mouse_input:
 		sprite(xx, yy, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
 	}
 
-	const float su = dx || dy ? clamp(p->time / tt, 0.f, 1.f) : .25f;
-	const float sv =
-		dx < 0 ? .75f : dx > 0 ? .25f :
-		dy < 0 ? .0f : dy > 0 ? .5f : .5f;
+	const float s = dx || dy ? clamp(p->time / tt, 0.f, 1.f) : .25f;
+	float u0 = 0.f, v0 = 0.f, u1 = 1.f, v1 = 1.f;
 
-	float u0, v0, u1, v1;
-	texUvPlayer(u0, v0, u1, v1, su, sv);
+	if (dx < 0.f)
+		texUvPlayer_left(u0, v0, u1, v1, s);
+	else if (dx > 0.f)
+		texUvPlayer_right(u0, v0, u1, v1, s);
+	else if (dy < 0.f)
+		texUvPlayer_up(u0, v0, u1, v1, s);
+	else if (dy > 0.f)
+		texUvPlayer_down(u0, v0, u1, v1, s);
+	else
+	{
+		u0 = .5f, u1 = u0 + .125f;
+		v0 = .25f, v1 = v0 + .125f;
+	}
+
+	if (p->move)
+		v0 += .5f, v1 += .5f;
+
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
 
 	gprintf(.02f, .05f, 0x00ffffff, "LEVEL: %s", g_map_progression[g_current_map].name);
@@ -1055,7 +1085,8 @@ ignore_mouse_input:
 		gprintf(0.5 - rxsize, 0.5 - rysize + 0.05f, 0x00ffffff, " Click to continue");
 
 		float u0, v0, u1, v1;
-		texUvPlayer(u0, v0, u1, v1, .25f, .5f);
+		u0 = .5f, u1 = u0 + .125f;
+		v0 = .375f, v1 = v0 + .125f;
 		sprite(x, y + 25.f, 128.f, TEX_PLAYER, u0, v0, u1, v1);
 	}
 }
