@@ -573,6 +573,9 @@ struct Player
 	int path;
 	int move;
 	float speed;
+#if _WIN32
+	HCHANNEL sound_channel;
+#endif
 };
 
 struct Move
@@ -915,6 +918,14 @@ void gamePlay(float elapse, unsigned* stage)
 						float r = 1.0f - ((p->path - min_dist) / (max_dist - min_dist));
 						p->speed += (min_speed - max_speed) * r;
 					}
+
+						// Trigger sounds
+#if _WIN32
+						BASS_ChannelStop(p->sound_channel);
+						HSAMPLE sample = BASS_SampleLoad(0, "data/walk.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
+						p->sound_channel = BASS_SampleGetChannel(sample, 0);
+						BASS_ChannelPlay(p->sound_channel, 1);
+#endif
 				}
 				else
 				{
@@ -928,6 +939,12 @@ void gamePlay(float elapse, unsigned* stage)
 				p->iy = p->y - m->dy;
 				p->time = 0.f;
 				p->move = 1;
+#if _WIN32
+				BASS_ChannelStop(p->sound_channel);
+				HSAMPLE sample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
+				p->sound_channel = BASS_SampleGetChannel(sample, 0);
+				BASS_ChannelPlay(p->sound_channel, 1);
+#endif
 			}
 		}
 	}
@@ -957,6 +974,12 @@ ignore_mouse_input:
 				p->iy = p->y - m->dy;
 				p->move = 1;
 				p->speed = 0.55f;
+#if _WIN32
+				BASS_ChannelStop(p->sound_channel);
+				HSAMPLE sample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
+				p->sound_channel = BASS_SampleGetChannel(sample, 0);
+				BASS_ChannelPlay(p->sound_channel, 1);
+#endif
 			}
 		}
 		else if (p->move)
@@ -984,6 +1007,15 @@ ignore_mouse_input:
 				m->y1 = -1;
 				m->dx = 0;
 				m->dy = 0;
+#if _WIN32
+				BASS_ChannelStop(p->sound_channel);
+				if(isTargetTile(g_world.crates[m->ci].x, g_world.crates[m->ci].y))
+				{
+					HSAMPLE sample = BASS_SampleLoad(0, "data/success.wav", 0, 0, 1, 0);
+					p->sound_channel = BASS_SampleGetChannel(sample, 0);
+					BASS_ChannelPlay(p->sound_channel, 1);
+				}
+#endif
 			}
 		}
 	}
