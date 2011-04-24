@@ -572,6 +572,7 @@ struct Player
 	int ix, iy;
 	int path;
 	int move;
+	float speed;
 };
 
 struct Move
@@ -745,6 +746,7 @@ void gamePlay(float elapse, unsigned* stage)
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
 		p->path = -1;
+		p->speed = 0.5f;
 
 		if (g_gameStart.loadGameOnStart)
 		{
@@ -899,6 +901,20 @@ void gamePlay(float elapse, unsigned* stage)
 				{
 					p->ix = gp->path[p->path].x;
 					p->iy = gp->path[p->path].y;
+
+					float min_speed = 0.4f;
+					float max_speed = 0.2f;
+					float min_dist = 3;
+					float max_dist = 18;
+					p->speed = max_speed;
+
+					if(p->path <= min_dist)
+						p->speed = min_speed;
+					else if (p->path < max_dist)
+					{
+						float r = 1.0f - ((p->path - min_dist) / (max_dist - min_dist));
+						p->speed += (min_speed - max_speed) * r;
+					}
 				}
 				else
 				{
@@ -919,13 +935,11 @@ void gamePlay(float elapse, unsigned* stage)
 ignore_mouse_input:
 	;
 
-	const float tt = .5f;
-
 	if (p->path < 0 && !p->move)
 		;
-	else if ((p->time += elapse) >= tt)
+	else if ((p->time += elapse) >= p->speed)
 	{
-		p->time -= tt;
+		p->time -= p->speed;
 
 		if (p->path >= 0)
 		{
@@ -942,6 +956,7 @@ ignore_mouse_input:
 				p->ix = p->x - m->dx;
 				p->iy = p->y - m->dy;
 				p->move = 1;
+				p->speed = 0.55f;
 			}
 		}
 		else if (p->move)
@@ -1019,8 +1034,8 @@ ignore_mouse_input:
 
 	const int dx = p->ix - p->x;
 	const int dy = p->iy - p->y;
-	const float ix = dx * ss * (p->time / tt);
-	const float iy = dy * ss * (p->time / tt);
+	const float ix = dx * ss * (p->time / p->speed);
+	const float iy = dy * ss * (p->time / p->speed);
 
 	for (int i = 0; i < g_world.ncrates; ++i)
 	{
@@ -1045,7 +1060,7 @@ ignore_mouse_input:
 		sprite(xx, yy, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
 	}
 
-	const float s = dx || dy ? clamp(p->time / tt, 0.f, 1.f) : .25f;
+	const float s = dx || dy ? clamp(p->time / p->speed, 0.f, 1.f) : .25f;
 	float u0 = 0.f, v0 = 0.f, u1 = 1.f, v1 = 1.f;
 
 	if (dx < 0.f)
