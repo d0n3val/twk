@@ -767,6 +767,7 @@ void gamePlay(float elapse, unsigned* stage)
 		gp->finished = 0;
 		gp->intro = -M_PI;
 		gp->stepSaved = 0;
+		gp->moves = 0;
 
 		if (!g_gameStart.loadGameOnStart)
 		{
@@ -831,16 +832,25 @@ void gamePlay(float elapse, unsigned* stage)
 	{
 		*stage = ~0;
 	}
-
-	if (p->path >= 0 || p->move)
-		goto ignore_mouse_input;
-
-	if (keyDown('u') && gp->moves > 0)
+	else if (keyDown('u') && (gp->moves > 0 || p->path >= 0 || p->move))
 	{
-		--gp->moves;
-		p->x = gp->steps[gp->moves].playerx;
-		p->y = gp->steps[gp->moves].playery;
+		if(p->path < 0 && p->move == 0)
+			--gp->moves;
+		else
+		{
+			p->move = 0;
+			p->path = -1;
+			m->x0 = -1;
+			m->y0 = -1;
+			m->x1 = -1;
+			m->y1 = -1;
+			m->dx = 0;
+			m->dy = 0;
+		}
+		p->ix = p->x = gp->steps[gp->moves].playerx;
+		p->iy = p->y = gp->steps[gp->moves].playery;
 		memcpy(g_world.crates, gp->steps[gp->moves].crates, sizeof(struct Crate) * g_world.ncrates);
+		printf("undoing ... %d\n");
 	}
 
 	if (gp->stepSaved == 0)
@@ -850,6 +860,9 @@ void gamePlay(float elapse, unsigned* stage)
 		gp->steps[gp->moves].playery = p->y;
 		memcpy(gp->steps[gp->moves].crates, g_world.crates, sizeof(struct Crate) * g_world.ncrates);
 	}
+
+	if (p->path >= 0 || p->move)
+		goto ignore_mouse_input;
 
 	const int mx = unposX(g_mousex, ss);
 	const int my = unposY(g_mousey, ss);
