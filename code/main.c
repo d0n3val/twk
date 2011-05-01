@@ -850,7 +850,6 @@ void gamePlay(float elapse, unsigned* stage)
 		p->ix = p->x = gp->steps[gp->moves].playerx;
 		p->iy = p->y = gp->steps[gp->moves].playery;
 		memcpy(g_world.crates, gp->steps[gp->moves].crates, sizeof(struct Crate) * g_world.ncrates);
-		printf("undoing ... %d\n");
 	}
 
 	if (gp->stepSaved == 0)
