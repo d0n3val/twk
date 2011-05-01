@@ -313,6 +313,18 @@ void playMusic(const char* path)
 #endif
 }
 
+void ChangeRes(int w, int h, const char * name)
+{
+	char title[80] = "Touchy Warehouse Keeper - ";
+	const int scrw = glutGet(GLUT_SCREEN_WIDTH) * 0.5f;
+	const int scrh = glutGet(GLUT_SCREEN_HEIGHT) * 0.5f;
+
+	strcat(title, name);
+	glutSetWindowTitle(title);
+	glutReshapeWindow(w, h);
+	glutPositionWindow(scrw - w/2, scrh - h/2);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 struct Spring
@@ -552,7 +564,23 @@ void gameStart(float elapse, unsigned* stage)
 
 	if (buttonUp(0) || !!(gs->loadGameOnStart = keyDown('c')))
 		++(*stage);
+
+	if (keyDown('1'))
+		ChangeRes(glutGet(GLUT_SCREEN_WIDTH) / 2, glutGet(GLUT_SCREEN_HEIGHT) / 2, "PC");
+	else if (keyDown('2'))
+		ChangeRes(1024, 800, "Galaxy Tablet");
+	else if (keyDown('3'))
+		ChangeRes(1024, 768, "Ipad");
+	else if (keyDown('4'))
+		ChangeRes(1024, 600, "Playbook");
+	else if (keyDown('5'))
+		ChangeRes(960, 640, "Iphone 4");
+	else if (keyDown('6'))
+		ChangeRes(800, 480, "Galaxy Phone");
+	else if (keyDown('7'))
+		ChangeRes(480, 360, "BlackBerry");
 }
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1602,7 +1630,7 @@ void init(int* argc, char* argv[])
 	glutInitWindowPosition(scrw / 4, scrh / 4);
 	glutInitWindowSize(scrw / 2, scrh / 2);
 
-	g_window = glutCreateWindow("twk");
+	g_window = glutCreateWindow("Touchy Warehouse Keeper - PC");
 
 	glutKeyboardFunc(&onKeyDown);
 	glutKeyboardUpFunc(&onKeyUp);
