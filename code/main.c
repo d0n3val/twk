@@ -305,9 +305,6 @@ void playMusic(const char* path)
 {
 	(void) path;
 
-	if (g_mute)
-		return;
-
 #if _WIN32
 	char data_path[PATH_NAME_SIZE] = DATA_DIR;
 	strcat(data_path, path);
@@ -1822,6 +1819,8 @@ void init(int* argc, char* argv[])
 
 #if _WIN32
 	BASS_Init(-1, 44100, 0, 0, NULL);
+	if (g_mute == 1)
+		BASS_SetVolume(0.0f);
 #endif
 
 	// load data
