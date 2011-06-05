@@ -215,6 +215,7 @@ unsigned g_tex[NUM_TEX];
 struct MapInfo
 {
 	char name[80];
+	char txt[256];
 	char file[PATH_NAME_SIZE];
 	char music[PATH_NAME_SIZE];
 	char bg[PATH_NAME_SIZE];
@@ -1178,6 +1179,21 @@ ignore_mouse_input:
 	gprintf(.02f, .09f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
 	gprintf(.02f, .95f, 0x00ffffff, "[U]NDO [P]AUSE  [R]ESTART");
 
+	if( g_map_progression[g_current_map].txt[0] != 0) 
+	{
+		float row = 0.05f;
+		char txt[256];
+		strncpy(txt, g_map_progression[g_current_map].txt, 256);
+
+		char* tok = strtok(txt, "^");
+		while(tok != NULL)
+		{
+			gprintf(0.5f - (strlen(tok) * 0.005f), row, 0x00ffffff, tok);
+			row += 0.02f;
+			tok = strtok(NULL, "^");
+		}
+	}
+
 	if (winConditions == 1) 
 	{
 		float size = 210.f;
@@ -1671,6 +1687,12 @@ void loadConfig(const char* path)
 			i += sizeof(CFG_FILE);
 			strncpy(g_map_progression[map].file, &data[i], PATH_NAME_SIZE);
 			i += strlen(g_map_progression[map].file);
+		}
+		else if (strncmp(&data[i], CFG_TXT, sizeof(CFG_TXT) - 1) == 0)
+		{
+			i += sizeof(CFG_TXT);
+			strncpy(g_map_progression[map].txt, &data[i], 256);
+			i += strlen(g_map_progression[map].txt);
 		}
 		else if (strncmp(&data[i], CFG_NAME, sizeof(CFG_NAME) - 1) == 0)
 		{
