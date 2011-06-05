@@ -3,8 +3,8 @@
 # define WIN32_LEAN_AND_MEAN
 # include <windows.h>
 # include <ctime> 
-# include "bass/bass.h"
 # pragma comment(lib, "bass/bass.lib")
+# pragma comment(lib, "mxml/mxml1.lib")
 #elif __linux__
 # include <dirent.h>
 # include <sys/time.h>
@@ -20,6 +20,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "mmgr.h"
+#if _WIN32
+# include "bass/bass.h"
+# include "mxml/mxml.h"
+#endif
 
 #if _WIN32
 # define _foreach_file(path,func) \
@@ -234,7 +239,8 @@ int g_current_map = 0;
 #define TILE_TARGET ('*')
 #define TILE_UNKNOWN ('?')
 
-#define MAX_CRATES 64
+#define MAX_CRATES 32
+#define MAX_LAYERS 10
 
 struct Crate
 {
@@ -246,16 +252,20 @@ struct World
 	int ncrates;
 	struct Crate crates[MAX_CRATES];
 
+	int ntargets;
+	struct Crate targets[MAX_CRATES];
+
 	int startx, starty;
 	int nx, ny;
-	char tiles[4096];
+	int nlayers;
+	unsigned char tiles[MAX_LAYERS][4096];
 };
 
 struct World g_world;
 
 int worldTile(int x, int y)
 {
-	return x >= 0 && y >= 0 ? g_world.tiles[y * g_world.nx + x] : TILE_UNKNOWN;
+	return x >= 0 && y >= 0 ? g_world.tiles[0][y * g_world.nx + x] : TILE_UNKNOWN;
 }
 
 struct Crate* worldCrate(int x, int y)
@@ -278,6 +288,7 @@ void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float
 
 char* loadFile(const char *path, int *readed);
 void loadMap(const char* path);
+void loadMap_tmx(const char* path);
 void saveGame();
 void loadGame();
 void loadConfig(const char* path);
@@ -739,9 +750,12 @@ int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world
 
 int isTargetTile(int x, int y)
 {
-	int t = worldTile(x, y);
-	if (t == TILE_TARGET || t == TILE_START_TARGET || t == TILE_CRATE_TARGET )
-		return 1;
+	struct Crate* target = &g_world.targets[g_world.ntargets];
+	while(target-- != g_world.targets)
+	{
+		if (target->x == x && target->y == y)
+			return 1;
+	}
 	return 0;
 }
 
@@ -771,7 +785,12 @@ void gamePlay(float elapse, unsigned* stage)
 
 		if (!g_gameStart.loadGameOnStart)
 		{
-			loadMap(g_map_progression[g_current_map].file);
+			char* ext = strchr(g_map_progression[g_current_map].file, '.');
+
+			if (strcmp(ext, ".tmx") == 0)
+				loadMap_tmx(g_map_progression[g_current_map].file);
+			else
+				loadMap(g_map_progression[g_current_map].file);
 			playMusic(g_map_progression[g_current_map].music);
 		}
 
@@ -1433,6 +1452,109 @@ char* loadFile(const char *path, int *readed)
 	return data;
 }
 
+void loadMap_tmx(const char* path)
+{
+		int n = 0;
+		char data_path[PATH_NAME_SIZE] = DATA_DIR;
+		char* data = loadFile(strcat(data_path, path), &n);
+
+		memset(&g_world, 0, sizeof(g_world));
+
+		mxml_node_t *tree = mxmlLoadString(NULL, data, MXML_TEXT_CALLBACK);
+		mxml_node_t *map = mxmlFindElement(tree, tree, "map", NULL, NULL, MXML_DESCEND_FIRST);
+
+		g_world.nx = atoi(mxmlElementGetAttr(map, "width"));
+		g_world.ny = atoi(mxmlElementGetAttr(map, "height"));
+		int tilesize = atoi(mxmlElementGetAttr(map, "tilewidth"));
+
+		printf("Map of %dx%d, tile size: %d\n", g_world.nx, g_world.ny, tilesize); 
+
+		mxml_index_t *index, *index2;
+		mxml_node_t *node, *subnode, *node2;
+
+		// Tileset loading ---
+		index = mxmlIndexNew(map, "tileset", NULL);
+
+		while((node = mxmlIndexEnum(index)) != NULL)
+		{
+			int gid = atoi(mxmlElementGetAttr(node, "firstgid"));
+			subnode = mxmlFindElement(node, tree, "image", NULL, NULL, MXML_DESCEND_FIRST);
+			const char* src = mxmlElementGetAttr(subnode, "source");
+			int w = atoi(mxmlElementGetAttr(subnode, "width"));
+			int h = atoi(mxmlElementGetAttr(subnode, "height"));
+
+			printf("New tileset found '%s' (%dx%d) starts guid %d\n", src, w, h, gid);
+			mxmlDelete(subnode);
+		}
+		mxmlIndexDelete(index);		
+
+		// Layer loading ---
+		index = mxmlIndexNew(map, "layer", NULL);
+
+		while((node = mxmlIndexEnum(index)) != NULL)
+		{
+			subnode = mxmlFindElement(node, tree, "data", NULL, NULL, MXML_DESCEND_FIRST);
+			index2 = mxmlIndexNew(subnode, "tile", NULL);
+			int i = 0;
+			//printf("New Layer found %d\n", g_world.nlayers);
+			while((node2 = mxmlIndexEnum(index2)) != NULL)
+			{
+				g_world.tiles[g_world.nlayers][i++] = atoi(mxmlElementGetAttr(node2, "gid"));
+				//printf("%d,", g_world.tiles[g_world.nlayers][i-1]);
+				//if(i%g_world.nx == 0)
+					//printf("\n");
+			}
+			//printf("\n");
+			g_world.nlayers++;
+			mxmlIndexDelete(index2);
+			mxmlDelete(subnode);
+		}
+		mxmlIndexDelete(index);
+
+		// Objects loading ---
+		// Only supports one ¨objectgroup¨. Inside it only 3 types of objects are valid:
+		// - start: position were the player starts
+		// - crate: a crate will be created in that position
+		// - target: all targets need to have a crate in order to finish a level
+
+		mxml_node_t *objectsgroup = mxmlFindElement(map, tree, "objectgroup", NULL, NULL, MXML_DESCEND_FIRST);
+		index = mxmlIndexNew(objectsgroup, "object", NULL);
+
+		while((node = mxmlIndexEnum(index)) != NULL)
+		{
+			int x = atoi(mxmlElementGetAttr(node, "x")) / tilesize;
+			int y = atoi(mxmlElementGetAttr(node, "y")) / tilesize;
+			const char* type = mxmlElementGetAttr(node, "type");
+			//printf("New object found %s at %dx%d\n", type,x,y);
+			if(strcmp(type, "start") == 0)
+			{
+				g_world.startx = x;
+				g_world.starty = y;
+				//printf("Players starts at %dx%d\n",x,y);
+			}
+			if(strcmp(type, "crate") == 0)
+			{
+				g_world.crates[g_world.ncrates].x = x;
+				g_world.crates[g_world.ncrates].y = y;
+				g_world.ncrates++;
+				//printf("Crate found at %dx%d\n",x,y);
+			}
+			if(strcmp(type, "target") == 0)
+			{
+				g_world.targets[g_world.ntargets].x = x;
+				g_world.targets[g_world.ntargets].y = y;
+				g_world.ntargets++;
+				//printf("Target found at %dx%d\n",x,y);
+			}
+		}
+		mxmlIndexDelete(index);
+
+		// ----------------------
+		mxmlDelete(tree);
+		free(data);
+		exit(0);
+}
+
 void loadMap(const char* path)
 {
 		int n = 0;
@@ -1442,12 +1564,16 @@ void loadMap(const char* path)
 		memset(&g_world, 0, sizeof(g_world));
 
 		struct Crate* crate = g_world.crates;
-		char* dst = g_world.tiles;
+		struct Crate* target = g_world.targets;
+		unsigned char* dst = g_world.tiles[0];
 		char* src = data;
 
 		for (int i = 0, x = 0; i < n; ++i)
 		{
 			const char c = *src++;
+
+			if (c == TILE_CRATE_TARGET || c == TILE_START_TARGET || c == TILE_TARGET)
+				target->x = x, (target++)->y = g_world.ny;
 
 			if (c == TILE_VOID || c == TILE_WALL || c == TILE_FLOOR || c == TILE_TARGET)
 				++x, *dst++ = c;
@@ -1466,6 +1592,7 @@ void loadMap(const char* path)
 		}
 
 		g_world.ncrates = crate - g_world.crates;
+		g_world.ntargets = target - g_world.targets;
 		free(data);
 }
 
@@ -1520,6 +1647,7 @@ void loadGame()
 #define CFG_FILE ("file")
 #define CFG_SEED ("seed")
 #define CFG_PAR ("par")
+#define CFG_TXT ("txt")
 
 void loadConfig(const char* path)
 {
