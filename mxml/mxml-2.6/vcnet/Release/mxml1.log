@@ -1,0 +1,29 @@
+﻿Build started 29/05/2011 13:45:03.
+     1>Project "C:\Users\done\Desktop\twk\code\mxml-2.6\vcnet\mxml1.vcxproj" on node 2 (build target(s)).
+     1>InitializeBuildStatus:
+         Touching "Release\mxml1.unsuccessfulbuild".
+       ClCompile:
+         All outputs are up-to-date.
+     1>C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\Microsoft.CppBuild.targets(990,5): warning MSB8012: TargetPath(C:\Users\done\Desktop\twk\code\mxml-2.6\vcnet\Release\mxml1.dll) does not match the Linker's OutputFile property value (C:\Users\done\Desktop\twk\code\mxml-2.6\vcnet\mxml1.dll). This may cause your project to build incorrectly. To correct this, please make sure that $(OutDir), $(TargetName) and $(TargetExt) property values match the value specified in %(Link.OutputFile).
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"mxml1.dll" /INCREMENTAL:NO /NOLOGO /DEF:".\mxml1.def" /MANIFEST /ManifestFile:"Release\mxml1.dll.intermediate.manifest" /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /PDB:"C:\Users\done\Desktop\twk\code\mxml-2.6\vcnet\Release\mxml1.pdb" /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /TLBID:1 /DYNAMICBASE:NO /IMPLIB:"mxml1.lib" /MACHINE:X86 /DLL "Release\mxml-attr.obj"
+         "Release\mxml-entity.obj"
+         "Release\mxml-file.obj"
+         "Release\mxml-index.obj"
+         "Release\mxml-node.obj"
+         "Release\mxml-private.obj"
+         "Release\mxml-search.obj"
+         "Release\mxml-set.obj"
+         "Release\mxml-string.obj"
+            Creating library mxml1.lib and object mxml1.exp
+         mxml1.vcxproj -> C:\Users\done\Desktop\twk\code\mxml-2.6\vcnet\Release\mxml1.dll
+       Manifest:
+         C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\mt.exe /nologo /verbose /outputresource:"mxml1.dll;#2" /manifest Release\mxml1.dll.intermediate.manifest
+       FinalizeBuildStatus:
+         Deleting file "Release\mxml1.unsuccessfulbuild".
+         Touching "Release\mxml1.lastbuildstate".
+     1>Done Building Project "C:\Users\done\Desktop\twk\code\mxml-2.6\vcnet\mxml1.vcxproj" (build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:01.67

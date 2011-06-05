@@ -1,0 +1,17 @@
+﻿Build started 29/05/2011 13:18:43.
+     1>Project "C:\Users\done\Desktop\twk\code\mxml-2.6\vcnet\mxmldoc.vcxproj" on node 3 (build target(s)).
+     1>InitializeBuildStatus:
+         Creating "Debug\mxmldoc.unsuccessfulbuild" because "AlwaysCreate" was specified.
+       ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /I../vcnet /I.. /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _VC80_UPGRADE=0x0710 /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc100.pdb" /Gd /TC /analyze- /errorReport:prompt ..\mxmldoc.c
+         mxmldoc.c
+     1>c:\users\done\desktop\twk\code\mxml-2.6\mxmldoc.c(5774): error C2471: cannot update program database 'c:\users\done\desktop\twk\code\mxml-2.6\vcnet\debug\vc100.pdb'
+     1>c:\users\done\desktop\twk\code\mxml-2.6\mxmldoc.c(5774): error C2471: cannot update program database ''
+     1>c:\users\done\desktop\twk\code\mxml-2.6\mxmldoc.c(5774): error C2471: cannot update program database ''
+     1>c:\users\done\desktop\twk\code\mxml-2.6\mxmldoc.c(5774): error C2471: cannot update program database ''
+     1>cl : Command line warning D9028: minimal rebuild failure, reverting to normal build
+     1>Done Building Project "C:\Users\done\Desktop\twk\code\mxml-2.6\vcnet\mxmldoc.vcxproj" (build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:02.64
