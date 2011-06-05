@@ -5,14 +5,21 @@
 # include <ctime> 
 # pragma comment(lib, "bass/bass.lib")
 # pragma comment(lib, "mxml/mxml1.lib")
-#elif __linux__
+#elif __linux__ || _MACOSX
 # include <dirent.h>
 # include <sys/time.h>
 # include <time.h>
 #endif
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/glut.h>
+#ifdef _MACOSX
+# include <OpenGL/gl.h>
+# include <OpenGL/glu.h>
+# include <GLUT/glut.h>
+# include "../bass/bass.h"
+#else 
+# include <GL/gl.h>
+# include <GL/glu.h>
+# include <GL/glut.h>
+#endif
 #include <assert.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -43,7 +50,8 @@
 # define snooze(msec) Sleep(msec)
 # define tbfreq(out) do { LARGE_INTEGER _; QueryPerformanceFrequency(&_); out = _.QuadPart; } while (0)
 # define tbcount(out) do { LARGE_INTEGER _; QueryPerformanceCounter(&_); out = _.QuadPart; } while (0)
-#elif __linux__
+//#elif __linux__
+#else
 # define _foreach_file(path,func) \
 	do { \
 		DIR* _dir; \
@@ -295,7 +303,7 @@ void loadConfig(const char* path);
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#if _WIN32
+#if _WIN32 || _MACOSX
 HSTREAM g_musicStream = 0;
 #endif
 unsigned g_mute;
@@ -304,7 +312,7 @@ void playMusic(const char* path)
 {
 	(void) path;
 
-#if _WIN32
+#if _WIN32 || _MACOSX
 	char data_path[PATH_NAME_SIZE] = DATA_DIR;
 	strcat(data_path, path);
 
@@ -609,7 +617,7 @@ struct Player
 	int path;
 	int move;
 	float speed;
-#if _WIN32
+#if _WIN32 || _MACOSX
 	HCHANNEL sound_channel;
 #endif
 };
@@ -976,7 +984,7 @@ void gamePlay(float elapse, unsigned* stage)
 					}
 
 						// Trigger sounds
-#if _WIN32
+#if _WIN32 || _MACOSX
 						BASS_ChannelStop(p->sound_channel);
 						HSAMPLE sample = BASS_SampleLoad(0, "data/walk.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
 						p->sound_channel = BASS_SampleGetChannel(sample, 0);
@@ -995,7 +1003,7 @@ void gamePlay(float elapse, unsigned* stage)
 				p->iy = p->y - m->dy;
 				p->time = 0.f;
 				p->move = 1;
-#if _WIN32
+#if _WIN32 || _MACOSX
 				BASS_ChannelStop(p->sound_channel);
 				HSAMPLE sample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
 				p->sound_channel = BASS_SampleGetChannel(sample, 0);
@@ -1030,7 +1038,7 @@ ignore_mouse_input:
 				p->iy = p->y - m->dy;
 				p->move = 1;
 				p->speed = 0.55f;
-#if _WIN32
+#if _WIN32 || _MACOSX
 				BASS_ChannelStop(p->sound_channel);
 				HSAMPLE sample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
 				p->sound_channel = BASS_SampleGetChannel(sample, 0);
@@ -1063,7 +1071,7 @@ ignore_mouse_input:
 				m->y1 = -1;
 				m->dx = 0;
 				m->dy = 0;
-#if _WIN32
+#if _WIN32 || _MACOSX
 				BASS_ChannelStop(p->sound_channel);
 				if(isTargetTile(g_world.crates[m->ci].x, g_world.crates[m->ci].y))
 				{
@@ -1816,7 +1824,7 @@ void init(int* argc, char* argv[])
 
 	// init bass
 
-#if _WIN32
+#if _WIN32 || _MACOSX
 	BASS_Init(-1, 44100, 0, 0, NULL);
 	if (g_mute == 1)
 		BASS_SetVolume(0.0f);
@@ -1829,7 +1837,7 @@ void init(int* argc, char* argv[])
 
 void end()
 {
-#if _WIN32
+#if _WIN32 || _MACOSX
 	BASS_Free();
 #endif
 	glutDestroyWindow(g_window);
