@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mmgr.h"
 #if _WIN32
 # include "bass/bass.h"
 # include "mxml/mxml.h"
