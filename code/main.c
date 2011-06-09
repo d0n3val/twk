@@ -175,6 +175,8 @@ enum
 	NUM_TEX
 };
 
+#define MAX_TEX 100
+
 #define texUvPlayer_up(u0,v0,u1,v1,s) \
 	do { \
 		u0 = 0.f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
@@ -212,7 +214,7 @@ const char* g_texnames[] = {
 	"cloud"
 };
 
-unsigned g_tex[NUM_TEX];
+unsigned g_tex[NUM_TEX+MAX_TEX];
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -250,7 +252,7 @@ int g_current_map = 0;
 #define MAX_CRATES 32
 #define MAX_LAYERS 10
 
-struct Crate
+struct Object
 {
 	int x, y;
 };
@@ -258,31 +260,75 @@ struct Crate
 struct World
 {
 	int ncrates;
-	struct Crate crates[MAX_CRATES];
+	struct Object crates[MAX_CRATES];
 
 	int ntargets;
-	struct Crate targets[MAX_CRATES];
+	struct Object targets[MAX_CRATES];
 
 	int startx, starty;
 	int nx, ny;
 	int nlayers;
+	int wallLayer;
 	unsigned char tiles[MAX_LAYERS][4096];
 };
 
 struct World g_world;
 
-int worldTile(int x, int y)
+int worldTile(int layer, int x, int y)
 {
-	return x >= 0 && y >= 0 ? g_world.tiles[0][y * g_world.nx + x] : TILE_UNKNOWN;
+	return x >= 0 && y >= 0 ? g_world.tiles[layer][y * g_world.nx + x] : TILE_UNKNOWN;
 }
 
-struct Crate* worldCrate(int x, int y)
+struct Object* worldCrates(int x, int y)
 {
 	for (int i = 0; i < g_world.ncrates; ++i)
 		if (g_world.crates[i].x == x && g_world.crates[i].y == y)
 			return &g_world.crates[i];
 
 	return NULL;
+}
+
+struct Object* worldTargets(int x, int y)
+{
+	for (int i = 0; i < g_world.ntargets; ++i)
+		if (g_world.targets[i].x == x && g_world.targets[i].y == y)
+			return &g_world.targets[i];
+
+	return NULL;
+}
+
+int isWall(int x, int y)
+{
+	int w = worldTile(g_world.wallLayer, x, y);
+
+	if (g_world.nlayers > 1)
+		return w != 0;
+	else
+		return w == TILE_WALL || w == TILE_VOID;
+}
+
+int isWalkable(int x, int y)
+{
+	int w = worldTile(g_world.wallLayer, x, y);
+
+	if (g_world.nlayers > 1)
+		return w == 0;
+	else
+		return w == TILE_FLOOR || w == TILE_TARGET;
+}
+
+int isTargetTile(int x, int y)
+{
+	if (g_world.nlayers > 1)
+		return worldTargets(x,y) != NULL;
+
+	struct Object* target = &g_world.targets[g_world.ntargets];
+	while(target-- != g_world.targets)
+	{
+		if (target->x == x && target->y == y)
+			return 1;
+	}
+	return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -640,7 +686,7 @@ struct Timer
 
 struct UndoStep
 {
-	struct Crate crates[MAX_CRATES];
+	struct Object crates[MAX_CRATES];
 	int playerx, playery;
 };
 
@@ -719,7 +765,7 @@ int pathFind(int startx, int starty, int goalx, int goaly)
 			if (j < nclosed)
 				continue;
 
-			if (worldTile(x, y) == TILE_WALL || worldCrate(x, y))
+			if (isWall(x, y) || worldCrates(x, y))
 				continue;
 
 			for (j = 0; j < nopen; ++j)
@@ -753,17 +799,6 @@ float posY(int y, int s) { return g_height * .5f - s * (g_world.ny * .5f) + y * 
 int unposX(float x, int s) { return (x + s *.5f - (g_width * .5f - s * (g_world.nx * .5f))) / s; }
 int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world.ny * .5f))) / s; }
 
-int isTargetTile(int x, int y)
-{
-	struct Crate* target = &g_world.targets[g_world.ntargets];
-	while(target-- != g_world.targets)
-	{
-		if (target->x == x && target->y == y)
-			return 1;
-	}
-	return 0;
-}
-
 int checkWinConditions()
 {
 	for (int i = 0; i < g_world.ncrates; ++i)
@@ -771,6 +806,14 @@ int checkWinConditions()
 			return 0;
 
 	return 1;
+}
+
+int getTexCoords(int tile, float *vu, float *vv)
+{
+	int rel = (tile-1) % 16;
+	*vv = ((rel / 4) ) * .25f;
+	*vu = ((rel % 4) ) * .25f;
+	return NUM_TEX + 1 + (tile/16);
 }
 
 void gamePlay(float elapse, unsigned* stage)
@@ -873,7 +916,7 @@ void gamePlay(float elapse, unsigned* stage)
 		}
 		p->ix = p->x = gp->steps[gp->moves].playerx;
 		p->iy = p->y = gp->steps[gp->moves].playery;
-		memcpy(g_world.crates, gp->steps[gp->moves].crates, sizeof(struct Crate) * g_world.ncrates);
+		memcpy(g_world.crates, gp->steps[gp->moves].crates, sizeof(struct Object) * g_world.ncrates);
 	}
 
 	if (gp->stepSaved == 0)
@@ -881,7 +924,7 @@ void gamePlay(float elapse, unsigned* stage)
 		gp->stepSaved = 1;
 		gp->steps[gp->moves].playerx = p->x;
 		gp->steps[gp->moves].playery = p->y;
-		memcpy(gp->steps[gp->moves].crates, g_world.crates, sizeof(struct Crate) * g_world.ncrates);
+		memcpy(gp->steps[gp->moves].crates, g_world.crates, sizeof(struct Object) * g_world.ncrates);
 	}
 
 	if (p->path >= 0 || p->move)
@@ -892,7 +935,7 @@ void gamePlay(float elapse, unsigned* stage)
 
 	if (buttonDown(0))
 	{
-		struct Crate* crate = worldCrate(mx, my);
+		struct Object* crate = worldCrates(mx, my);
 
 		m->x0 = -1;
 		m->y0 = -1;
@@ -916,7 +959,7 @@ void gamePlay(float elapse, unsigned* stage)
 			int n = max(mx, m->x0 - 1);
 
 			for (; i < n + 1; ++i)
-				if ((worldTile(i, my) != TILE_FLOOR && worldTile(i, my) != TILE_TARGET) || worldCrate(i, my))
+				if (!isWalkable(i, my))
 					break;
 
 			if (i > n)
@@ -931,7 +974,7 @@ void gamePlay(float elapse, unsigned* stage)
 			int n = max(my, m->y0 - 1);
 
 			for (; i < n + 1; ++i)
-				if ((worldTile(mx, i) != TILE_FLOOR && worldTile(mx, i) != TILE_TARGET) || worldCrate(mx, i))
+				if (!isWalkable(mx, i))
 					break;
 
 			if (i > n)
@@ -1096,20 +1139,40 @@ ignore_mouse_input:
 	const float vx = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 	const float vy = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 
-	for (int y = 0; y < g_world.ny; ++y)
+	for (int n = 0; n < g_world.nlayers; ++n)
 	{
-		for (int x = 0; x < g_world.nx; ++x)
+		for (int y = 0; y < g_world.ny; ++y)
 		{
-			const float vu = vx + floorf((.3f + .3f * sinf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
-			const float vv = vy + floorf((.5f + .2f * cosf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
-			const int tile = worldTile(x, y);
+			for (int x = 0; x < g_world.nx; ++x)
+			{
+				float vu,vv;
+				const int tile = worldTile(n, x, y);
 
-			if (tile == TILE_FLOOR)
-				sprite(posX(x, ss), posY(y, ss), ss, TEX_FLOORVARS, vu, vv, vu + .25f, vv + .25f);
-			else if (tile == TILE_WALL)
-				sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLVARS, vu, vv, vu + .25f, vv + .25f);
-			else if (tile == TILE_TARGET)
-				sprite(posX(x, ss), posY(y, ss), ss, TEX_TARGET_G, 0.f, 0.f, 1.f, 1.f);
+				if(g_world.nlayers > 1 && tile > 0)
+				{
+					int id = getTexCoords(tile, &vu, &vv);
+					sprite(posX(x, ss), posY(y, ss), ss, id, vu, vv, vu + .25f, vv + .25f);
+					
+					//if(n == g_world.wallLayer)
+					//{
+					//	vu = vx + floorf((.3f + .3f * sinf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
+					//	vv = vy + floorf((.5f + .2f * cosf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
+					//	sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLVARS, vu, vv, vu + .25f, vv + .25f);
+					//}
+				}
+				else
+				{
+					vu = vx + floorf((.3f + .3f * sinf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
+					vv = vy + floorf((.5f + .2f * cosf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
+
+					if (tile == TILE_FLOOR)
+						sprite(posX(x, ss), posY(y, ss), ss, TEX_FLOORVARS, vu, vv, vu + .25f, vv + .25f);
+					else if (tile == TILE_WALL)
+						sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLVARS, vu, vv, vu + .25f, vv + .25f);
+					else if (tile == TILE_TARGET)
+						sprite(posX(x, ss), posY(y, ss), ss, TEX_TARGET_G, 0.f, 0.f, 1.f, 1.f);
+				}
+			}
 		}
 	}
 
@@ -1503,7 +1566,19 @@ void loadMap_tmx(const char* path)
 			int w = atoi(mxmlElementGetAttr(subnode, "width"));
 			int h = atoi(mxmlElementGetAttr(subnode, "height"));
 
-			printf("New tileset found '%s' (%dx%d) starts guid %d\n", src, w, h, gid);
+			strcpy(data_path, DATA_DIR);
+			strcat(data_path, src);
+			char* ext = strrchr (data_path, '.');
+			strcpy(ext, ".rgba");
+			char* img = loadFile(data_path, &n);
+			assert(n == w * h * 4);
+
+			int tex_id = NUM_TEX + 1 + gid/16;
+			glGenTextures(1, &g_tex[tex_id]);
+			glBindTexture(GL_TEXTURE_2D, g_tex[tex_id]);
+			glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
+			free(img);
+
 			mxmlDelete(subnode);
 		}
 		mxmlIndexDelete(index);		
@@ -1513,18 +1588,19 @@ void loadMap_tmx(const char* path)
 
 		while((node = mxmlIndexEnum(index)) != NULL)
 		{
+			const char* name = mxmlElementGetAttr(node, "name");
 			subnode = mxmlFindElement(node, tree, "data", NULL, NULL, MXML_DESCEND_FIRST);
 			index2 = mxmlIndexNew(subnode, "tile", NULL);
 			int i = 0;
-			//printf("New Layer found %d\n", g_world.nlayers);
 			while((node2 = mxmlIndexEnum(index2)) != NULL)
 			{
 				g_world.tiles[g_world.nlayers][i++] = atoi(mxmlElementGetAttr(node2, "gid"));
-				//printf("%d,", g_world.tiles[g_world.nlayers][i-1]);
-				//if(i%g_world.nx == 0)
-					//printf("\n");
 			}
-			//printf("\n");
+			if(stricmp("Walls", name) == 0)
+			{
+				g_world.wallLayer = g_world.nlayers; 
+				printf("Found wall in layer %d\n", g_world.wallLayer);
+			}
 			g_world.nlayers++;
 			mxmlIndexDelete(index2);
 			mxmlDelete(subnode);
@@ -1545,26 +1621,22 @@ void loadMap_tmx(const char* path)
 			int x = atoi(mxmlElementGetAttr(node, "x")) / tilesize;
 			int y = atoi(mxmlElementGetAttr(node, "y")) / tilesize;
 			const char* type = mxmlElementGetAttr(node, "type");
-			//printf("New object found %s at %dx%d\n", type,x,y);
 			if(strcmp(type, "start") == 0)
 			{
 				g_world.startx = x;
 				g_world.starty = y;
-				//printf("Players starts at %dx%d\n",x,y);
 			}
 			if(strcmp(type, "crate") == 0)
 			{
 				g_world.crates[g_world.ncrates].x = x;
 				g_world.crates[g_world.ncrates].y = y;
 				g_world.ncrates++;
-				//printf("Crate found at %dx%d\n",x,y);
 			}
 			if(strcmp(type, "target") == 0)
 			{
 				g_world.targets[g_world.ntargets].x = x;
 				g_world.targets[g_world.ntargets].y = y;
 				g_world.ntargets++;
-				//printf("Target found at %dx%d\n",x,y);
 			}
 		}
 		mxmlIndexDelete(index);
@@ -1572,7 +1644,6 @@ void loadMap_tmx(const char* path)
 		// ----------------------
 		mxmlDelete(tree);
 		free(data);
-		exit(0);
 }
 
 void loadMap(const char* path)
@@ -1583,8 +1654,8 @@ void loadMap(const char* path)
 
 		memset(&g_world, 0, sizeof(g_world));
 
-		struct Crate* crate = g_world.crates;
-		struct Crate* target = g_world.targets;
+		struct Object* crate = g_world.crates;
+		struct Object* target = g_world.targets;
 		unsigned char* dst = g_world.tiles[0];
 		char* src = data;
 
@@ -1613,6 +1684,7 @@ void loadMap(const char* path)
 
 		g_world.ncrates = crate - g_world.crates;
 		g_world.ntargets = target - g_world.targets;
+		g_world.nlayers = 1;
 		free(data);
 }
 
