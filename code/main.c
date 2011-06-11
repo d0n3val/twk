@@ -251,14 +251,25 @@ int g_current_map = 0;
 
 #define MAX_CRATES 32
 #define MAX_LAYERS 10
+#define MAX_TEXTURES 20
 
 struct Object
 {
 	int x, y;
 };
 
+struct texData 
+{
+	int max_id;
+	int num_tiles;
+};
+
+
 struct World
 {
+	int ntextures;
+	struct texData Textures[MAX_TEXTURES];
+
 	int ncrates;
 	struct Object crates[MAX_CRATES];
 
@@ -808,12 +819,26 @@ int checkWinConditions()
 	return 1;
 }
 
-int getTexCoords(int tile, float *vu, float *vv)
+
+int getTileSize(int tile)
 {
-	int rel = (tile-1) % 16;
-	*vv = ((rel / 4) ) * .25f;
-	*vu = ((rel % 4) ) * .25f;
-	return NUM_TEX + 1 + (tile/16);
+	for(int i=0; i<g_world.ntextures; ++i)
+	{
+		if(tile < g_world.Textures[i].max_id)
+			return g_world.Textures[i].num_tiles;
+	}
+	assert(0 && "Texture not found");
+	return 0;
+}
+
+int getTexCoords(int tile, float *vu, float *vv, float *tilesize)
+{
+	int size = getTileSize(tile);
+	*tilesize = 1.0f/size;
+	int rel = (tile-1) % (size*size);
+	*vv = (rel / size) * (*tilesize);
+	*vu = (rel % size) * (*tilesize);
+	return NUM_TEX + 1 + (tile/(size*size));
 }
 
 void gamePlay(float elapse, unsigned* stage)
@@ -1150,8 +1175,9 @@ ignore_mouse_input:
 
 				if(g_world.nlayers > 1 && tile > 0)
 				{
-					int id = getTexCoords(tile, &vu, &vv);
-					sprite(posX(x, ss), posY(y, ss), ss, id, vu, vv, vu + .25f, vv + .25f);
+					float tilesize;
+					int id = getTexCoords(tile, &vu, &vv, &tilesize);
+					sprite(posX(x, ss), posY(y, ss), ss, id, vu, vv, vu + tilesize, vv + tilesize);
 					
 					//if(n == g_world.wallLayer)
 					//{
@@ -1525,6 +1551,11 @@ char* loadFile(const char *path, int *readed)
 
 	printf("Loading [%s]\n", path);
 	fd = fopen(path, "rb");
+	if(fd == NULL)
+	{
+		printf(">>> ERROR OPENING FILE [%s] <<<", path);
+		exit(1);
+	}
 	fseek(fd, 0, SEEK_END);
 	size = ftell(fd);
 	rewind(fd);
@@ -1561,6 +1592,10 @@ void loadMap_tmx(const char* path)
 		while((node = mxmlIndexEnum(index)) != NULL)
 		{
 			int gid = atoi(mxmlElementGetAttr(node, "firstgid"));
+			const char* tw = mxmlElementGetAttr(node, "tilewidth");
+			if(tw == NULL)
+				continue;
+			int tilesize = atoi(tw);
 			subnode = mxmlFindElement(node, tree, "image", NULL, NULL, MXML_DESCEND_FIRST);
 			const char* src = mxmlElementGetAttr(subnode, "source");
 			int w = atoi(mxmlElementGetAttr(subnode, "width"));
@@ -1573,11 +1608,17 @@ void loadMap_tmx(const char* path)
 			char* img = loadFile(data_path, &n);
 			assert(n == w * h * 4);
 
-			int tex_id = NUM_TEX + 1 + gid/16;
+			int num_subtextures = (w / tilesize);
+			int tex_id = NUM_TEX + 1 + gid/(num_subtextures*num_subtextures);
 			glGenTextures(1, &g_tex[tex_id]);
 			glBindTexture(GL_TEXTURE_2D, g_tex[tex_id]);
 			glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
 			free(img);
+
+			g_world.Textures[g_world.ntextures].max_id = gid + (num_subtextures*num_subtextures);
+			g_world.Textures[g_world.ntextures].num_tiles = num_subtextures;
+			//printf("Texture with max_id %d contains %dx%d squares\n", g_world.Textures[g_world.ntextures].max_id, num_subtextures, num_subtextures);
+			g_world.ntextures++;
 
 			mxmlDelete(subnode);
 		}
@@ -1599,7 +1640,7 @@ void loadMap_tmx(const char* path)
 			if(stricmp("Walls", name) == 0)
 			{
 				g_world.wallLayer = g_world.nlayers; 
-				printf("Found wall in layer %d\n", g_world.wallLayer);
+				//printf("Found wall in layer %d\n", g_world.wallLayer);
 			}
 			g_world.nlayers++;
 			mxmlIndexDelete(index2);
