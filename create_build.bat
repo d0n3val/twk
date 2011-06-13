@@ -9,6 +9,7 @@ call make.bat
 mkdir twk
 xcopy *.dll twk
 xcopy twk.exe twk
+xcopy CREDITS twk
 xcopy /i data twk\data
 del /s /q twk\data\*.bin
 del /s /q twk\data\*.*~

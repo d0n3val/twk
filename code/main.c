@@ -270,6 +270,8 @@ struct World
 	int ntextures;
 	struct texData Textures[MAX_TEXTURES];
 
+	int crateTex;
+	int crateTargetTex;
 	int ncrates;
 	struct Object crates[MAX_CRATES];
 
@@ -373,7 +375,7 @@ void playMusic(const char* path)
 	char data_path[PATH_NAME_SIZE] = DATA_DIR;
 	strcat(data_path, path);
 
-	printf("Loading [%s]\n", data_path);
+	printf("Loading music [%s], Nick dancing in 3 2 1\n", data_path);
 	if (g_musicStream != 0 )
 	{
 		BASS_ChannelStop(g_musicStream);
@@ -1242,7 +1244,19 @@ ignore_mouse_input:
 		const float w = min(t / (M_PI * 4.5f), 1.f);
 		const float ss2 = ss * .5f + ss * (cosf(t) + 1.f) * .5f;
 		const float ss3 = w * ss + (1.f - w) * ss2;
-		sprite(xx, yy, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
+
+		if(g_world.nlayers > 1 && g_world.crateTex != 0)
+		{
+			int tex = g_world.crateTex;
+			if (isTargetTile(x,y) && g_world.crateTargetTex != 0)
+				tex = g_world.crateTargetTex;
+
+			float vv, vu, tilesize;
+			int id = getTexCoords(tex, &vu, &vv, &tilesize);
+			sprite(xx, yy, ss3 * sm, id, vu, vv, vu + tilesize, vv + tilesize);
+		}
+		else
+			sprite(xx, yy, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
 	}
 
 	const float s = dx || dy ? clamp(p->time / p->speed, 0.f, 1.f) : .25f;
@@ -1553,7 +1567,7 @@ char* loadFile(const char *path, int *readed)
 	fd = fopen(path, "rb");
 	if(fd == NULL)
 	{
-		printf(">>> ERROR OPENING FILE [%s] <<<", path);
+		printf(">>> ERROR OPENING FILE [%s] <<< ... blame Heiko", path);
 		exit(1);
 	}
 	fseek(fd, 0, SEEK_END);
@@ -1564,6 +1578,35 @@ char* loadFile(const char *path, int *readed)
 	fclose(fd);
 
 	return data;
+}
+
+void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
+{
+	// Tile properties
+	mxml_node_t *node, *property;
+	mxml_index_t *index = mxmlIndexNew(tileset, "tile", NULL);
+
+	while((node = mxmlIndexEnum(index)) != NULL)
+	{
+		int id = atoi(mxmlElementGetAttr(node, "id"));
+		property = mxmlFindElement(node, tree, "property", NULL, NULL, MXML_DESCEND);
+		if(property == NULL)
+			continue;
+
+		const char* name = mxmlElementGetAttr(property, "name");
+		if(name == NULL)
+			continue;
+
+		if(stricmp(name, "crate") == 0)
+			g_world.crateTex = id;
+		else if(stricmp(name, "cratetarget") == 0)
+			g_world.crateTargetTex = id;
+		else
+			printf("Unknown property for tile %d named [%s], blame Tony\n", id, name);
+
+		mxmlDelete(property);
+	}
+	mxmlIndexDelete(index);		
 }
 
 void loadMap_tmx(const char* path)
@@ -1581,7 +1624,7 @@ void loadMap_tmx(const char* path)
 		g_world.ny = atoi(mxmlElementGetAttr(map, "height"));
 		int tilesize = atoi(mxmlElementGetAttr(map, "tilewidth"));
 
-		printf("Map of %dx%d, tile size: %d\n", g_world.nx, g_world.ny, tilesize); 
+		printf("Map of %dx%d, tile size: %d, approved by Senta\n", g_world.nx, g_world.ny, tilesize); 
 
 		mxml_index_t *index, *index2;
 		mxml_node_t *node, *subnode, *node2;
@@ -1601,8 +1644,7 @@ void loadMap_tmx(const char* path)
 			int w = atoi(mxmlElementGetAttr(subnode, "width"));
 			int h = atoi(mxmlElementGetAttr(subnode, "height"));
 
-			strcpy(data_path, DATA_DIR);
-			strcat(data_path, src);
+			sprintf(data_path, "%s%s", DATA_DIR, src);
 			char* ext = strrchr (data_path, '.');
 			strcpy(ext, ".rgba");
 			char* img = loadFile(data_path, &n);
@@ -1620,6 +1662,7 @@ void loadMap_tmx(const char* path)
 			//printf("Texture with max_id %d contains %dx%d squares\n", g_world.Textures[g_world.ntextures].max_id, num_subtextures, num_subtextures);
 			g_world.ntextures++;
 
+			loadTileProperties(node, tree);
 			mxmlDelete(subnode);
 		}
 		mxmlIndexDelete(index);		
@@ -1640,7 +1683,7 @@ void loadMap_tmx(const char* path)
 			if(stricmp("Walls", name) == 0)
 			{
 				g_world.wallLayer = g_world.nlayers; 
-				//printf("Found wall in layer %d\n", g_world.wallLayer);
+				printf("Found wall in layer %d, Malte stills hates XML\n", g_world.wallLayer);
 			}
 			g_world.nlayers++;
 			mxmlIndexDelete(index2);
