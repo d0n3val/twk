@@ -29,6 +29,8 @@
 #include <string.h>
 #if _WIN32
 # include "bass/bass.h"
+#endif
+#if __linux__ || _WIN32
 # include "mxml/mxml.h"
 #endif
 
@@ -1588,7 +1590,7 @@ void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 
 	while((node = mxmlIndexEnum(index)) != NULL)
 	{
-		int id = atoi(mxmlElementGetAttr(node, "id"));
+		int id = 1 + atoi(mxmlElementGetAttr(node, "id"));
 		property = mxmlFindElement(node, tree, "property", NULL, NULL, MXML_DESCEND);
 		if(property == NULL)
 			continue;
@@ -1597,10 +1599,10 @@ void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 		if(name == NULL)
 			continue;
 
-		if(stricmp(name, "crate") == 0)
-			g_world.crateTex = id + 1;
-		else if(stricmp(name, "cratetarget") == 0)
-			g_world.crateTargetTex = id + 1;
+		if (strcmp(name, "crate") == 0)
+			g_world.crateTex = id;
+		else if (strcmp(name, "cratetarget") == 0)
+			g_world.crateTargetTex = id;
 		else
 			printf("Unknown property for tile %d named [%s], blame Tony\n", id, name);
 
@@ -1680,7 +1682,7 @@ void loadMap_tmx(const char* path)
 			{
 				g_world.tiles[g_world.nlayers][i++] = atoi(mxmlElementGetAttr(node2, "gid"));
 			}
-			if(stricmp("Walls", name) == 0)
+			if (strcmp("Walls", name) == 0)
 			{
 				g_world.wallLayer = g_world.nlayers; 
 				printf("Found wall in layer %d, Malte stills hates XML\n", g_world.wallLayer);
