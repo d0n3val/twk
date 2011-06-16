@@ -1598,9 +1598,9 @@ void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 			continue;
 
 		if(stricmp(name, "crate") == 0)
-			g_world.crateTex = id;
+			g_world.crateTex = id + 1;
 		else if(stricmp(name, "cratetarget") == 0)
-			g_world.crateTargetTex = id;
+			g_world.crateTargetTex = id + 1;
 		else
 			printf("Unknown property for tile %d named [%s], blame Tony\n", id, name);
 
