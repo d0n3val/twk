@@ -27,9 +27,10 @@
  * yet another define (_CRT_SECURE_NO_WARNINGS) instead.  Bastards.
  */
 
+#if _WIN32
 #define _CRT_SECURE_NO_DEPRECATE
 #define _CRT_SECURE_NO_WARNINGS
-
+#endif
 
 /*
  * Include necessary headers...
@@ -40,7 +41,9 @@
 #include <string.h>
 #include <stdarg.h>
 #include <ctype.h>
+#if _WIN32
 #include <io.h>
+#endif
 
 
 /*
@@ -53,6 +56,7 @@
  * names to the corresponding non-standard Microsoft names.
  */
 
+#if _WIN32
 #define close		_close
 #define open		_open
 #define read	        _read
@@ -60,6 +64,7 @@
 #define strdup		_strdup
 #define vsnprintf 	_vsnprintf
 #define write		_write
+#endif
 
 
 /*
@@ -73,7 +78,11 @@
  * Inline function support...
  */
 
+#if _WIN32
 #define inline _inline
+#else
+#define inline
+#endif
 
 
 /*
@@ -96,6 +105,14 @@
  */
 
 #define HAVE_STRDUP 1
+
+/*
+ * Do we have threading support?
+ */
+
+#if __linux__
+#define HAVE_PTHREAD_H 1
+#endif
 
 
 /*
