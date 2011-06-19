@@ -1590,6 +1590,7 @@ struct read_progress
 	unsigned int readed;
 };
 
+#if _WIN32
 void read_png(png_structp png_ptr, png_bytep outBytes, png_size_t byteCount)
 {
 	struct read_progress* data = (struct read_progress*) png_get_io_ptr(png_ptr);
@@ -1597,9 +1598,11 @@ void read_png(png_structp png_ptr, png_bytep outBytes, png_size_t byteCount)
 	memcpy(outBytes, &data->img[data->readed], byteCount);
 	data->readed += byteCount;
 }
+#endif // _WIN32
 
-int loadTexture(const char *data, int width, int height) 
+int loadTexture(const char *data, int size, int width, int height) 
 {
+#if _WIN32
 	struct read_progress img_data;
 
 	img_data.img = data;
@@ -1622,6 +1625,14 @@ int loadTexture(const char *data, int width, int height)
 
 	for (int i = 0; i < height; ++i)
 		memcpy(image_data+(row_bytes * i), row_pointers[i], row_bytes);
+#else
+	extern unsigned char *stbi_load_from_memory(
+		unsigned char const *buffer, int len, int *x, int *y, int *comp, int req_comp);
+
+	int comp;
+	unsigned char* image_data = stbi_load_from_memory(
+		(const unsigned char*) data, size, &width, &height, &comp, 0);
+#endif
 	
 	//Now generate the OpenGL texture object
 	unsigned int texture;
@@ -1630,10 +1641,12 @@ int loadTexture(const char *data, int width, int height)
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
+#if _WIN32
 	//clean up memory and close stuff
 	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-	free(image_data);
+#endif
 
+	free(image_data);
 	return texture;
 }
 
@@ -1706,7 +1719,7 @@ void loadMap_tmx(const char* path)
 
 			sprintf(data_path, "%s%s", DATA_DIR, src);
 			char* img = loadFile(data_path, &n);
-			g_tex[tex_id] = loadTexture(img, w, h);
+			g_tex[tex_id] = loadTexture(img, n, w, h);
 			free(img);
 
 			g_world.Textures[g_world.ntextures].max_id = gid + (num_subtextures*num_subtextures);
