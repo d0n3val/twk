@@ -1,0 +1,52 @@
+﻿Build started 18/06/2011 23:57:23.
+     1>Project "C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\pngtest\pngtest.vcxproj" on node 3 (build target(s)).
+     1>InitializeBuildStatus:
+         Touching "Release\pngtest.unsuccessfulbuild".
+       ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /I"..\..\..\zlib-1.2.5" /I..\..\..\scripts /Zi /nologo /W4 /WX /Ox /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _CONSOLE /D _UNICODE /D UNICODE /GF /Gm- /EHsc /MD /GS /Gy- /fp:precise /fp:except- /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc100.pdb" /FR"Release\\" /Gd /TC /wd4996 /analyze- /errorReport:prompt ..\..\..\pngtest.c
+         pngtest.c
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngtest.exe" /INCREMENTAL:NO /NOLOGO /LIBPATH:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\\" libpng15.lib /MANIFEST /ManifestFile:"Release\pngtest.exe.intermediate.manifest" /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /DEBUG /PDB:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngtest.pdb" /SUBSYSTEM:CONSOLE /OPT:REF /OPT:ICF /LTCG /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngtest.lib" /MACHINE:X86 Release\pngtest.obj
+         Generating code
+         Finished generating code
+         pngtest.vcxproj -> C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngtest.exe
+       Manifest:
+         C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\mt.exe /nologo /verbose /outputresource:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngtest.exe;#1" /manifest Release\pngtest.exe.intermediate.manifest
+       BscMake:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\bscmake.exe /nologo /o"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngtest.bsc" Release\pngtest.sbr
+       CustomBuildStep:
+         Description: Executing PNG test program
+         "C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngtest.exe" ..\..\..\pngtest.png "Release\pngout.png"
+         :VCEnd
+         
+          Testing libpng version 1.5.2
+            with zlib   version 1.2.5
+         libpng version 1.5.2 - March 31, 2011      Copyright (c) 1998-2011 Glenn Randers-Pehrson      Copyright (c) 1996-1997 Andreas Dilger      Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc. library (10502): libpng version 1.5.2 - March 31, 2011
+          pngtest (10502): libpng version 1.5.2 - March 31, 2011
+         
+          Testing ..\..\..\pngtest.png:
+          Pass 0: rwrwrwrwrwrwrwrwrw
+          Pass 1: rwrwrwrwrwrwrwrwrw
+          Pass 2: rwrwrwrwrwrwrwrw
+          Pass 3: rwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrw
+          Pass 4: rwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrw
+          Pass 5: rwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrw
+                  rwrwrwrw
+          Pass 6: rwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrwrw
+                  rwrwrwrwrw
+          PASS (9782 zero samples)
+          Filter 0 was used 21 times
+          Filter 1 was used 15 times
+          Filter 2 was used 52 times
+          Filter 3 was used 10 times
+          Filter 4 was used 33 times
+          tIME = 7 Jun 1996 17:58:08 +0000
+          libpng passes test
+       FinalizeBuildStatus:
+         Deleting file "Release\pngtest.unsuccessfulbuild".
+         Touching "Release\pngtest.lastbuildstate".
+     1>Done Building Project "C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\pngtest\pngtest.vcxproj" (build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:01.47

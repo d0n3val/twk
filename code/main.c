@@ -5,6 +5,7 @@
 # include <ctime> 
 # pragma comment(lib, "bass/bass.lib")
 # pragma comment(lib, "mxml/mxml1.lib")
+# pragma comment(lib, "libpng/libpng15.lib")
 #elif __linux__ || _MACOSX
 # include <dirent.h>
 # include <sys/time.h>
@@ -29,6 +30,7 @@
 #include <string.h>
 #if _WIN32
 # include "bass/bass.h"
+# include "libpng/libpng-1.5.2/png.h"
 #endif
 #if __linux__ || _WIN32
 # include "mxml/mxml.h"
@@ -1582,6 +1584,59 @@ char* loadFile(const char *path, int *readed)
 	return data;
 }
 
+struct read_progress
+{
+	const char* img;
+	unsigned int readed;
+};
+
+void read_png(png_structp png_ptr, png_bytep outBytes, png_size_t byteCount)
+{
+	struct read_progress* data = (struct read_progress*) png_get_io_ptr(png_ptr);
+
+	memcpy(outBytes, &data->img[data->readed], byteCount);
+	data->readed += byteCount;
+}
+
+int loadTexture(const char *data, int width, int height) 
+{
+	struct read_progress img_data;
+
+	img_data.img = data;
+	img_data.readed = 0;
+
+	png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+	png_infop info_ptr = png_create_info_struct(png_ptr);
+ 
+	if (setjmp(png_jmpbuf(png_ptr))) {
+		printf(">>> ERROR OPENING INVALID PNG FILE <<<");
+		png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+		exit(1);
+	}
+
+	png_set_read_fn(png_ptr, &img_data, read_png);
+	png_read_png(png_ptr, info_ptr, PNG_TRANSFORM_STRIP_16 | PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND, NULL);
+	unsigned int row_bytes = png_get_rowbytes(png_ptr, info_ptr);
+	png_byte *image_data = (png_byte *) malloc(row_bytes * height);
+	png_bytepp row_pointers = png_get_rows(png_ptr, info_ptr);
+
+	for (int i = 0; i < height; ++i)
+		memcpy(image_data+(row_bytes * i), row_pointers[i], row_bytes);
+	
+	//Now generate the OpenGL texture object
+	unsigned int texture;
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	//clean up memory and close stuff
+	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+	free(image_data);
+
+	return texture;
+}
+
 void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 {
 	// Tile properties
@@ -1646,17 +1701,12 @@ void loadMap_tmx(const char* path)
 			int w = atoi(mxmlElementGetAttr(subnode, "width"));
 			int h = atoi(mxmlElementGetAttr(subnode, "height"));
 
-			sprintf(data_path, "%s%s", DATA_DIR, src);
-			char* ext = strrchr (data_path, '.');
-			strcpy(ext, ".rgba");
-			char* img = loadFile(data_path, &n);
-			assert(n == w * h * 4);
-
 			int num_subtextures = (w / tilesize);
 			int tex_id = NUM_TEX + 1 + gid/(num_subtextures*num_subtextures);
-			glGenTextures(1, &g_tex[tex_id]);
-			glBindTexture(GL_TEXTURE_2D, g_tex[tex_id]);
-			glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
+
+			sprintf(data_path, "%s%s", DATA_DIR, src);
+			char* img = loadFile(data_path, &n);
+			g_tex[tex_id] = loadTexture(img, w, h);
 			free(img);
 
 			g_world.Textures[g_world.ntextures].max_id = gid + (num_subtextures*num_subtextures);

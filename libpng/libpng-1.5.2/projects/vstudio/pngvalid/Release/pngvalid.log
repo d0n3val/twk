@@ -1,0 +1,58 @@
+﻿Build started 18/06/2011 23:57:23.
+     1>Project "C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\pngvalid\pngvalid.vcxproj" on node 2 (build target(s)).
+     1>InitializeBuildStatus:
+         Touching "Release\pngvalid.unsuccessfulbuild".
+       ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\CL.exe /c /I"..\..\..\zlib-1.2.5" /I..\..\..\scripts /Zi /nologo /W4 /WX /Ox /Oi /Oy- /GL /D WIN32 /D NDEBUG /D _CONSOLE /D _UNICODE /D UNICODE /GF /Gm- /EHsc /MD /GS /Gy- /fp:precise /fp:except- /Zc:wchar_t /Zc:forScope /Fo"Release\\" /Fd"Release\vc100.pdb" /FR"Release\\" /Gd /TC /wd4996 /wd4127 /analyze- /errorReport:prompt ..\..\..\pngvalid.c
+         pngvalid.c
+       Link:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngvalid.exe" /INCREMENTAL:NO /NOLOGO /LIBPATH:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\\" libpng15.lib zlib.lib /MANIFEST /ManifestFile:"Release\pngvalid.exe.intermediate.manifest" /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /DEBUG /PDB:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngvalid.pdb" /SUBSYSTEM:CONSOLE /OPT:REF /OPT:ICF /LTCG /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngvalid.lib" /MACHINE:X86 Release\pngvalid.obj
+         Generating code
+         Finished generating code
+         pngvalid.vcxproj -> C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngvalid.exe
+       Manifest:
+         C:\Program Files (x86)\Microsoft SDKs\Windows\v7.0A\bin\mt.exe /nologo /verbose /outputresource:"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngvalid.exe;#1" /manifest Release\pngvalid.exe.intermediate.manifest
+       BscMake:
+         C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\bin\bscmake.exe /nologo /o"C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngvalid.bsc" Release\pngvalid.sbr
+       CustomBuildStep:
+         Description: Executing PNG validation program
+         "C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\Release\pngvalid.exe" --touch "Release\pngvalid.out"
+         :VCEnd
+         Gamma correction error summary
+         
+         The printed value is the maximum error in the pixel values
+         calculated by the libpng gamma correction code.  The error
+         is calculated as the difference between the output pixel
+         value (always an integer) and the ideal value from the
+         libpng specification (typically not an integer).
+         
+         Expect this value to be less than .5 for 8 bit formats,
+         less than 1 for formats with fewer than 8 bits and a small
+         number (typically less than 5) for the 16 bit formats.
+         For performance reasons the value for 16 bit formats
+         increases when the image file includes an sBIT chunk.
+         
+           2 bit gray:  0.73181
+           4 bit gray:  0.81888
+           8 bit gray:  0.49978
+           8 bit color: 0.49978
+          16 bit gray:  0.74080
+          16 bit color: 0.74080
+         Gamma correction with sBIT:
+          16 bit gray:  0.74058
+          16 bit color: 0.74058
+         Gamma correction with 16 to 8 bit reduction:
+          16 bit gray:  1.97052
+          16 bit color: 1.97052
+         Results using floating point arithmetic (no errors or warnings)
+         Allocated memory statistics (in bytes):
+         	read  32768 maximum single, 183170 peak, 183170 total
+         	write 65536 maximum single, 283206 peak, 283206 total
+       FinalizeBuildStatus:
+         Deleting file "Release\pngvalid.unsuccessfulbuild".
+         Touching "Release\pngvalid.lastbuildstate".
+     1>Done Building Project "C:\Users\done\Desktop\libpng-1.5.2\projects\vstudio\pngvalid\pngvalid.vcxproj" (build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:22.32
