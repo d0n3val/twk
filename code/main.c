@@ -364,7 +364,11 @@ void loadConfig(const char* path);
 ///////////////////////////////////////////////////////////////////////////////
 
 #if _WIN32 || _MACOSX
-HSTREAM g_musicStream = 0;
+void* g_musicData;
+HSTREAM g_musicStream;
+HSAMPLE g_walkSample;
+HSAMPLE g_pushSample;
+HSAMPLE g_successSample;
 #endif
 unsigned g_mute;
 
@@ -377,15 +381,22 @@ void playMusic(const char* path)
 	strcat(data_path, path);
 
 	printf("Loading music [%s], Nick dancing in 3 2 1\n", data_path);
-	if (g_musicStream != 0 )
+
+	if (g_musicStream != 0)
 	{
 		BASS_ChannelStop(g_musicStream);
-		//BASS_StreamFree(g_musicStream);
+		BASS_StreamFree(g_musicStream);
 		g_musicStream = 0;
+		free(g_musicData);
 	}
-		
-	g_musicStream = BASS_StreamCreateFile(FALSE, data_path, 0, 0, BASS_SAMPLE_LOOP);
-	BASS_ChannelPlay(g_musicStream, 0);
+
+	if (!g_mute)
+	{
+		int n;
+		g_musicData = (void*) loadFile(data_path, &n);
+		g_musicStream = BASS_StreamCreateFile(TRUE, g_musicData, 0, n, BASS_SAMPLE_LOOP);
+		BASS_ChannelPlay(g_musicStream, 0);
+	}
 #endif
 }
 
@@ -1056,10 +1067,12 @@ void gamePlay(float elapse, unsigned* stage)
 
 						// Trigger sounds
 #if _WIN32 || _MACOSX
-						BASS_ChannelStop(p->sound_channel);
-						HSAMPLE sample = BASS_SampleLoad(0, "data/walk.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
-						p->sound_channel = BASS_SampleGetChannel(sample, 0);
-						BASS_ChannelPlay(p->sound_channel, 1);
+						if (!g_mute)
+						{
+							BASS_ChannelStop(p->sound_channel);
+							p->sound_channel = BASS_SampleGetChannel(g_walkSample, 0);
+							BASS_ChannelPlay(p->sound_channel, 1);
+						}
 #endif
 				}
 				else
@@ -1075,10 +1088,12 @@ void gamePlay(float elapse, unsigned* stage)
 				p->time = 0.f;
 				p->move = 1;
 #if _WIN32 || _MACOSX
-				BASS_ChannelStop(p->sound_channel);
-				HSAMPLE sample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
-				p->sound_channel = BASS_SampleGetChannel(sample, 0);
-				BASS_ChannelPlay(p->sound_channel, 1);
+				if (!g_mute)
+				{
+					BASS_ChannelStop(p->sound_channel);
+					p->sound_channel = BASS_SampleGetChannel(g_pushSample, 0);
+					BASS_ChannelPlay(p->sound_channel, 1);
+				}
 #endif
 			}
 		}
@@ -1110,10 +1125,12 @@ ignore_mouse_input:
 				p->move = 1;
 				p->speed = 0.55f;
 #if _WIN32 || _MACOSX
-				BASS_ChannelStop(p->sound_channel);
-				HSAMPLE sample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
-				p->sound_channel = BASS_SampleGetChannel(sample, 0);
-				BASS_ChannelPlay(p->sound_channel, 1);
+				if (!g_mute)
+				{
+					BASS_ChannelStop(p->sound_channel);
+					p->sound_channel = BASS_SampleGetChannel(g_pushSample, 0);
+					BASS_ChannelPlay(p->sound_channel, 1);
+				}
 #endif
 			}
 		}
@@ -1143,12 +1160,15 @@ ignore_mouse_input:
 				m->dx = 0;
 				m->dy = 0;
 #if _WIN32 || _MACOSX
-				BASS_ChannelStop(p->sound_channel);
-				if(isTargetTile(g_world.crates[m->ci].x, g_world.crates[m->ci].y))
+				if (!g_mute)
 				{
-					HSAMPLE sample = BASS_SampleLoad(0, "data/success.wav", 0, 0, 1, 0);
-					p->sound_channel = BASS_SampleGetChannel(sample, 0);
-					BASS_ChannelPlay(p->sound_channel, 1);
+					BASS_ChannelStop(p->sound_channel);
+
+					if(isTargetTile(g_world.crates[m->ci].x, g_world.crates[m->ci].y))
+					{
+						p->sound_channel = BASS_SampleGetChannel(g_successSample, 0);
+						BASS_ChannelPlay(p->sound_channel, 1);
+					}
 				}
 #endif
 			}
@@ -2012,8 +2032,9 @@ void init(int* argc, char* argv[])
 
 #if _WIN32 || _MACOSX
 	BASS_Init(-1, 44100, 0, 0, NULL);
-	if (g_mute == 1)
-		BASS_SetVolume(0.0f);
+	g_pushSample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
+	g_walkSample = BASS_SampleLoad(0, "data/walk.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
+	g_successSample = BASS_SampleLoad(0, "data/success.wav", 0, 0, 1, 0);
 #endif
 
 	// load data
