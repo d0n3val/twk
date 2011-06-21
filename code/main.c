@@ -5,7 +5,6 @@
 # include <ctime> 
 # pragma comment(lib, "bass/bass.lib")
 # pragma comment(lib, "mxml/mxml1.lib")
-# pragma comment(lib, "libpng/libpng15.lib")
 #elif __linux__ || _MACOSX
 # include <dirent.h>
 # include <sys/time.h>
@@ -30,7 +29,6 @@
 #include <string.h>
 #if _WIN32
 # include "bass/bass.h"
-# include "libpng/libpng-1.5.2/png.h"
 #endif
 #if __linux__ || _WIN32
 # include "mxml/mxml.h"
@@ -54,7 +52,6 @@
 # define snooze(msec) Sleep(msec)
 # define tbfreq(out) do { LARGE_INTEGER _; QueryPerformanceFrequency(&_); out = _.QuadPart; } while (0)
 # define tbcount(out) do { LARGE_INTEGER _; QueryPerformanceCounter(&_); out = _.QuadPart; } while (0)
-//#elif __linux__
 #else
 # define _foreach_file(path,func) \
 	do { \
@@ -1590,49 +1587,22 @@ struct read_progress
 	unsigned int readed;
 };
 
-#if _WIN32
-void read_png(png_structp png_ptr, png_bytep outBytes, png_size_t byteCount)
-{
-	struct read_progress* data = (struct read_progress*) png_get_io_ptr(png_ptr);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-	memcpy(outBytes, &data->img[data->readed], byteCount);
-	data->readed += byteCount;
+extern unsigned char *stbi_load_from_memory(
+		unsigned char const *buffer, int len, int *x, int *y, int *comp, int req_comp);
+
+#ifdef __cplusplus
 }
-#endif // _WIN32
+#endif
 
 int loadTexture(const char *data, int size, int width, int height) 
 {
-#if _WIN32
-	struct read_progress img_data;
-
-	img_data.img = data;
-	img_data.readed = 0;
-
-	png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-	png_infop info_ptr = png_create_info_struct(png_ptr);
- 
-	if (setjmp(png_jmpbuf(png_ptr))) {
-		printf(">>> ERROR OPENING INVALID PNG FILE <<<");
-		png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-		exit(1);
-	}
-
-	png_set_read_fn(png_ptr, &img_data, read_png);
-	png_read_png(png_ptr, info_ptr, PNG_TRANSFORM_STRIP_16 | PNG_TRANSFORM_PACKING | PNG_TRANSFORM_EXPAND, NULL);
-	unsigned int row_bytes = png_get_rowbytes(png_ptr, info_ptr);
-	png_byte *image_data = (png_byte *) malloc(row_bytes * height);
-	png_bytepp row_pointers = png_get_rows(png_ptr, info_ptr);
-
-	for (int i = 0; i < height; ++i)
-		memcpy(image_data+(row_bytes * i), row_pointers[i], row_bytes);
-#else
-	extern unsigned char *stbi_load_from_memory(
-		unsigned char const *buffer, int len, int *x, int *y, int *comp, int req_comp);
-
 	int comp;
 	unsigned char* image_data = stbi_load_from_memory(
 		(const unsigned char*) data, size, &width, &height, &comp, 0);
-#endif
 	
 	//Now generate the OpenGL texture object
 	unsigned int texture;
@@ -1640,11 +1610,6 @@ int loadTexture(const char *data, int size, int width, int height)
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-#if _WIN32
-	//clean up memory and close stuff
-	png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
-#endif
 
 	free(image_data);
 	return texture;
