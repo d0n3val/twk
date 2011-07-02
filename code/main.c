@@ -106,6 +106,70 @@
 #define buttonUp(b) (!(g_buttons[0] & (1 << (b))) && (g_buttons[1] & (1 << (b))))
 #define buttonHeld(b) (g_buttons[0] & (1 << (b)))
 
+///////////////////////////////////////////////////////////////////////////////
+
+typedef float vec3[3];
+typedef float vec4[4];
+typedef float mat4[16];
+
+void mat4Identity(float* d)
+{
+	d[0] = 1.f; d[1] = 0.f; d[2] = 0.f; d[3] = 0.f;
+	d[4] = 0.f; d[5] = 1.f; d[6] = 0.f; d[7] = 0.f;
+	d[8] = 0.f; d[9] = 0.f; d[10] = 1.f; d[11] = 0.f;
+	d[12] = 0.f; d[13] = 0.f; d[14] = 0.f; d[15] = 1.f;
+}
+
+void mat4Mul(float* __restrict d, float* __restrict s, float* __restrict t)
+{
+	d[0] = s[0] * t[0] + s[1] * t[4] + s[2] * t[8] + s[3] * t[12];
+	d[1] = s[0] * t[1] + s[1] * t[5] + s[2] * t[9] + s[3] * t[13];
+	d[2] = s[0] * t[2] + s[1] * t[6] + s[2] * t[10] + s[3] * t[14];
+	d[3] = s[0] * t[3] + s[1] * t[7] + s[2] * t[11] + s[3] * t[15];
+	d[4] = s[4] * t[0] + s[5] * t[4] + s[6] * t[8] + s[7] * t[12];
+	d[5] = s[4] * t[1] + s[5] * t[5] + s[6] * t[9] + s[7] * t[13];
+	d[6] = s[4] * t[2] + s[5] * t[6] + s[6] * t[10] + s[7] * t[14];
+	d[7] = s[4] * t[3] + s[5] * t[7] + s[6] * t[11] + s[7] * t[15];
+	d[8] = s[8] * t[0] + s[9] * t[4] + s[10] * t[8] + s[11] * t[12];
+	d[9] = s[8] * t[1] + s[9] * t[5] + s[10] * t[9] + s[11] * t[13];
+	d[10] = s[8] * t[2] + s[9] * t[6] + s[10] * t[10] + s[11] * t[14];
+	d[11] = s[8] * t[3] + s[9] * t[7] + s[10] * t[11] + s[11] * t[15];
+	d[12] = s[12] * t[0] + s[13] * t[4] + s[14] * t[8] + s[15] * t[12];
+	d[13] = s[12] * t[1] + s[13] * t[5] + s[14] * t[9] + s[15] * t[13];
+	d[14] = s[12] * t[2] + s[13] * t[6] + s[14] * t[10] + s[15] * t[14];
+	d[15] = s[12] * t[3] + s[13] * t[7] + s[14] * t[11] + s[15] * t[15];
+}
+
+static void mat4Ortho(float* m, float left, float right, float bottom, float top, float znear, float zfar)
+{
+	float width = right - left;
+	float height = top - bottom;
+	float depth = zfar - znear;
+
+	float x = (right + left) / width;
+	float y = (top + bottom) / height;
+	float z = (zfar + znear) / depth;
+
+	m[0] = 2.f / width;
+	m[1] = 0.f;
+	m[2] = 0.f;
+	m[3] = 0.f;
+	m[4] = 0.f;
+	m[5] = 2.f / height;
+	m[6] = 0.f;
+	m[7] = 0.f;
+	m[8] = 0.f;
+	m[9] = 0.f;
+	m[10] = 2.f / depth;
+	m[11] = 0.f;
+	m[12] = -x;
+	m[13] = -y;
+	m[14] = -z;
+	m[15] = 1.f;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 unsigned long long g_clock;
 double g_period;
 float g_elapse;
@@ -836,11 +900,10 @@ int checkWinConditions()
 
 int getTileSize(int tile)
 {
-	for(int i=0; i<g_world.ntextures; ++i)
-	{
-		if(tile < g_world.Textures[i].max_id)
+	for (int i=0; i<g_world.ntextures; ++i)
+		if (tile < g_world.Textures[i].max_id)
 			return g_world.Textures[i].num_tiles;
-	}
+
 	assert(0 && "Texture not found");
 	return 0;
 }
@@ -878,6 +941,7 @@ void gamePlay(float elapse, unsigned* stage)
 				loadMap_tmx(g_map_progression[g_current_map].file);
 			else
 				loadMap(g_map_progression[g_current_map].file);
+
 			playMusic(g_map_progression[g_current_map].music);
 		}
 
@@ -889,6 +953,7 @@ void gamePlay(float elapse, unsigned* stage)
 		if (g_gameStart.loadGameOnStart)
 		{
 			g_gameStart.loadGameOnStart = 0;
+
 			loadGame();
 			playMusic(g_map_progression[g_current_map].music);
 		}
@@ -903,6 +968,7 @@ void gamePlay(float elapse, unsigned* stage)
 			playMusic("win.mp3");
 			gp->finished = 1;
 		}
+
 		if (buttonDown(0))
 		{
 			if (g_map_progression[++g_current_map].par < 0)
@@ -910,6 +976,7 @@ void gamePlay(float elapse, unsigned* stage)
 			else
 				*stage = ~0;
 		}
+
 		goto ignore_mouse_input;
 	}
 
@@ -1065,14 +1132,14 @@ void gamePlay(float elapse, unsigned* stage)
 						p->speed += (min_speed - max_speed) * r;
 					}
 
-						// Trigger sounds
+					// Trigger sounds
 #if _WIN32 || _MACOSX
-						if (!g_mute)
-						{
-							BASS_ChannelStop(p->sound_channel);
-							p->sound_channel = BASS_SampleGetChannel(g_walkSample, 0);
-							BASS_ChannelPlay(p->sound_channel, 1);
-						}
+					if (!g_mute)
+					{
+						BASS_ChannelStop(p->sound_channel);
+						p->sound_channel = BASS_SampleGetChannel(g_walkSample, 0);
+						BASS_ChannelPlay(p->sound_channel, 1);
+					}
 #endif
 				}
 				else
@@ -1087,6 +1154,7 @@ void gamePlay(float elapse, unsigned* stage)
 				p->iy = p->y - m->dy;
 				p->time = 0.f;
 				p->move = 1;
+
 #if _WIN32 || _MACOSX
 				if (!g_mute)
 				{
@@ -1124,6 +1192,7 @@ ignore_mouse_input:
 				p->iy = p->y - m->dy;
 				p->move = 1;
 				p->speed = 0.55f;
+
 #if _WIN32 || _MACOSX
 				if (!g_mute)
 				{
@@ -1159,6 +1228,7 @@ ignore_mouse_input:
 				m->y1 = -1;
 				m->dx = 0;
 				m->dy = 0;
+
 #if _WIN32 || _MACOSX
 				if (!g_mute)
 				{
@@ -1529,9 +1599,17 @@ void onDisplay()
 
 	// render game
 
+	mat4 identity;
+	mat4Identity(identity);
+
+	mat4 matrix;
+	mat4Ortho(matrix, 0.f, g_width, g_height, 0.f, -1.f, 1.f);
+
+	mat4 proj;
+	mat4Mul(proj, identity, matrix);
+
 	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluOrtho2D(0.f, g_width, g_height, 0.f);
+	glLoadMatrixf(proj);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
