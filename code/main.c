@@ -9,6 +9,7 @@
 # include <dirent.h>
 # include <sys/time.h>
 # include <time.h>
+# include <strings.h>
 #endif
 #ifdef _MACOSX
 # include <OpenGL/gl.h>
@@ -98,6 +99,8 @@
 #define max(a,b) ((a) < (b) ? (b) : (a))
 #define clamp(a,mn,mx) min(max(a, mn), mx)
 
+#define sgn(a) ((a) > 0 ? 1 : (a) < 0 ? -1 : 0)
+
 #define keyDown(k) ((g_keys[0][(k) >> 5] & (1 << ((k) & 0x1f))) && !(g_keys[1][(k) >> 5] & (1 << ((k) & 0x1f))))
 #define keyUp(k) (!(g_keys[0][(k) >> 5] & (1 << ((k) & 0x1f))) && (g_keys[1][(k) >> 5] & (1 << ((k) & 0x1f))))
 #define keyHeld(k) (g_keys[0][(k) >> 5] & (1 << ((k) & 0x1f)))
@@ -105,6 +108,10 @@
 #define buttonDown(b) ((g_buttons[0] & (1 << (b))) && !(g_buttons[1] & (1 << (b))))
 #define buttonUp(b) (!(g_buttons[0] & (1 << (b))) && (g_buttons[1] & (1 << (b))))
 #define buttonHeld(b) (g_buttons[0] & (1 << (b)))
+
+#if __linux__ || _MACOSX
+# define stricmp(s,t,n) strcasecmp((s), (t))
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -329,7 +336,6 @@ struct texData
 	int num_tiles;
 };
 
-
 struct World
 {
 	int ntextures;
@@ -401,11 +407,11 @@ int isTargetTile(int x, int y)
 		return worldTargets(x,y) != NULL;
 
 	struct Object* target = &g_world.targets[g_world.ntargets];
+
 	while(target-- != g_world.targets)
-	{
 		if (target->x == x && target->y == y)
 			return 1;
-	}
+
 	return 0;
 }
 
@@ -709,7 +715,7 @@ void gameStart(float elapse, unsigned* stage)
 	if (buttonDown(2))
 	{
 		++g_current_map;
-		if(g_map_progression[g_current_map].par < 0)
+		if (g_map_progression[g_current_map].par < 0)
 			g_current_map = 0;
 	}
 
@@ -900,7 +906,7 @@ int checkWinConditions()
 
 int getTileSize(int tile)
 {
-	for (int i=0; i<g_world.ntextures; ++i)
+	for (int i = 0; i < g_world.ntextures; ++i)
 		if (tile < g_world.Textures[i].max_id)
 			return g_world.Textures[i].num_tiles;
 
@@ -911,11 +917,13 @@ int getTileSize(int tile)
 int getTexCoords(int tile, float *vu, float *vv, float *tilesize)
 {
 	int size = getTileSize(tile);
-	*tilesize = 1.0f/size;
-	int rel = (tile-1) % (size*size);
-	*vv = (rel / size) * (*tilesize);
-	*vu = (rel % size) * (*tilesize);
-	return NUM_TEX + 1 + (tile/(size*size));
+	*tilesize = 1.f / size;
+
+	int rel = (tile - 1) % (size * size);
+	*vv = (rel / size) * (1.f / size);
+	*vu = (rel % size) * (1.f / size);
+
+	return NUM_TEX + 1 + (tile / (size * size));
 }
 
 void gamePlay(float elapse, unsigned* stage)
@@ -937,7 +945,7 @@ void gamePlay(float elapse, unsigned* stage)
 		{
 			char* ext = strchr(g_map_progression[g_current_map].file, '.');
 
-			if (strcmp(ext, ".tmx") == 0)
+			if (stricmp(ext, ".tmx") == 0)
 				loadMap_tmx(g_map_progression[g_current_map].file);
 			else
 				loadMap(g_map_progression[g_current_map].file);
@@ -1007,7 +1015,7 @@ void gamePlay(float elapse, unsigned* stage)
 	}
 	else if (keyDown('u') && (gp->moves > 0 || p->path >= 0 || p->move))
 	{
-		if(p->path < 0 && p->move == 0)
+		if (p->path < 0 && p->move == 0)
 			--gp->moves;
 		else
 		{
@@ -1020,6 +1028,7 @@ void gamePlay(float elapse, unsigned* stage)
 			m->dx = 0;
 			m->dy = 0;
 		}
+
 		p->ix = p->x = gp->steps[gp->moves].playerx;
 		p->iy = p->y = gp->steps[gp->moves].playery;
 		memcpy(g_world.crates, gp->steps[gp->moves].crates, sizeof(struct Object) * g_world.ncrates);
@@ -1124,7 +1133,7 @@ void gamePlay(float elapse, unsigned* stage)
 					float max_dist = 18;
 					p->speed = max_speed;
 
-					if(p->path <= min_dist)
+					if (p->path <= min_dist)
 						p->speed = min_speed;
 					else if (p->path < max_dist)
 					{
@@ -1234,7 +1243,7 @@ ignore_mouse_input:
 				{
 					BASS_ChannelStop(p->sound_channel);
 
-					if(isTargetTile(g_world.crates[m->ci].x, g_world.crates[m->ci].y))
+					if (isTargetTile(g_world.crates[m->ci].x, g_world.crates[m->ci].y))
 					{
 						p->sound_channel = BASS_SampleGetChannel(g_successSample, 0);
 						BASS_ChannelPlay(p->sound_channel, 1);
@@ -1266,12 +1275,12 @@ ignore_mouse_input:
 				float vu,vv;
 				const int tile = worldTile(n, x, y);
 
-				if(g_world.nlayers > 1 && tile > 0)
+				if (g_world.nlayers > 1 && tile > 0)
 				{
 					float tilesize;
 					int id = getTexCoords(tile, &vu, &vv, &tilesize);
 					sprite(posX(x, ss), posY(y, ss), ss, id, vu, vv, vu + tilesize, vv + tilesize);
-					
+
 					//if(n == g_world.wallLayer)
 					//{
 					//	vu = vx + floorf((.3f + .3f * sinf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
@@ -1336,7 +1345,7 @@ ignore_mouse_input:
 		const float ss2 = ss * .5f + ss * (cosf(t) + 1.f) * .5f;
 		const float ss3 = w * ss + (1.f - w) * ss2;
 
-		if(g_world.nlayers > 1 && g_world.crateTex != 0)
+		if (g_world.nlayers > 1 && g_world.crateTex != 0)
 		{
 			int tex = g_world.crateTex;
 			if (isTargetTile(x,y) && g_world.crateTargetTex != 0)
@@ -1377,7 +1386,7 @@ ignore_mouse_input:
 	gprintf(.02f, .09f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
 	gprintf(.02f, .95f, 0x00ffffff, "[U]NDO [P]AUSE  [R]ESTART");
 
-	if( g_map_progression[g_current_map].txt[0] != 0) 
+	if (g_map_progression[g_current_map].txt[0] != 0) 
 	{
 		float row = 0.05f;
 		char txt[256];
@@ -1730,9 +1739,9 @@ void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 		if(name == NULL)
 			continue;
 
-		if (strcmp(name, "crate") == 0)
+		if (stricmp(name, "crate") == 0)
 			g_world.crateTex = id;
-		else if (strcmp(name, "cratetarget") == 0)
+		else if (stricmp(name, "cratetarget") == 0)
 			g_world.crateTargetTex = id;
 		else
 			printf("Unknown property for tile %d named [%s], blame Tony\n", id, name);
@@ -1804,15 +1813,18 @@ void loadMap_tmx(const char* path)
 			subnode = mxmlFindElement(node, tree, "data", NULL, NULL, MXML_DESCEND_FIRST);
 			index2 = mxmlIndexNew(subnode, "tile", NULL);
 			int i = 0;
+
 			while((node2 = mxmlIndexEnum(index2)) != NULL)
 			{
 				g_world.tiles[g_world.nlayers][i++] = atoi(mxmlElementGetAttr(node2, "gid"));
 			}
-			if (strcmp("Walls", name) == 0)
+
+			if (stricmp("walls", name) == 0)
 			{
 				g_world.wallLayer = g_world.nlayers; 
 				printf("Found wall in layer %d, Malte stills hates XML\n", g_world.wallLayer);
 			}
+
 			g_world.nlayers++;
 			mxmlIndexDelete(index2);
 			mxmlDelete(subnode);
@@ -1833,18 +1845,21 @@ void loadMap_tmx(const char* path)
 			int x = atoi(mxmlElementGetAttr(node, "x")) / tilesize;
 			int y = atoi(mxmlElementGetAttr(node, "y")) / tilesize;
 			const char* type = mxmlElementGetAttr(node, "type");
-			if(strcmp(type, "start") == 0)
+
+			if (stricmp(type, "start") == 0)
 			{
 				g_world.startx = x;
 				g_world.starty = y;
 			}
-			if(strcmp(type, "crate") == 0)
+
+			if (stricmp(type, "crate") == 0)
 			{
 				g_world.crates[g_world.ncrates].x = x;
 				g_world.crates[g_world.ncrates].y = y;
 				g_world.ncrates++;
 			}
-			if(strcmp(type, "target") == 0)
+
+			if (stricmp(type, "target") == 0)
 			{
 				g_world.targets[g_world.ntargets].x = x;
 				g_world.targets[g_world.ntargets].y = y;
@@ -2026,7 +2041,7 @@ void onFile(char* path)
 	if ((ext = strchr(path, '.')) == NULL)
 		return;
 
-	if (strcmp(ext, ".rgba") == 0)
+	if (stricmp(ext, ".rgba") == 0)
 	{
 		char name[64];
 		int w, h, i;
@@ -2035,7 +2050,7 @@ void onFile(char* path)
 			return;
 
 		for (i = 0; i < NUM_TEX; ++i)
-			if (strcmp(g_texnames[i], name) == 0)
+			if (stricmp(g_texnames[i], name) == 0)
 				break;
 
 		if (i == NUM_TEX)
@@ -2049,7 +2064,7 @@ void onFile(char* path)
 		glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		free(data);
 	}
-	else if (strcmp(ext, ".cfg") == 0)
+	else if (stricmp(ext, ".cfg") == 0)
 	{
 		loadConfig(path);
 	}
@@ -2132,7 +2147,7 @@ int main(int argc, char* argv[])
 {
 	for (int i = 0; i < argc; ++i)
 	{
-		if (!strcmp(argv[i], "-mute"))
+		if (stricmp(argv[i], "-mute") == 0)
 			g_mute = 1;
 	}
 
