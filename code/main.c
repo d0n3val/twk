@@ -35,6 +35,17 @@
 # include "mxml/mxml.h"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern unsigned char *stbi_load_from_memory(
+	unsigned char const *buffer, int len, int *x, int *y, int *comp, int req_comp);
+
+#ifdef __cplusplus
+}
+#endif
+
 #if _WIN32
 # define _foreach_file(path,func) \
 	do { \
@@ -100,6 +111,8 @@
 #define clamp(a,mn,mx) min(max(a, mn), mx)
 
 #define sgn(a) ((a) > 0 ? 1 : (a) < 0 ? -1 : 0)
+
+#define sqr(a) ((a) * (a))
 
 #define keyDown(k) ((g_keys[0][(k) >> 5] & (1 << ((k) & 0x1f))) && !(g_keys[1][(k) >> 5] & (1 << ((k) & 0x1f))))
 #define keyUp(k) (!(g_keys[0][(k) >> 5] & (1 << ((k) & 0x1f))) && (g_keys[1][(k) >> 5] & (1 << ((k) & 0x1f))))
@@ -247,7 +260,7 @@ enum
 	NUM_TEX
 };
 
-#define MAX_TEX 100
+#define NUM_MAP_TEX (16)
 
 #define texUvPlayer_up(u0,v0,u1,v1,s) \
 	do { \
@@ -273,7 +286,8 @@ enum
 		v0 = .125f; v1 = .25f; \
 	} while (0)
 
-const char* g_texnames[] = {
+const char* g_texnames[] =
+{
 	"crate",
 	"player",
 	"wallfloor",
@@ -286,7 +300,32 @@ const char* g_texnames[] = {
 	"cloud"
 };
 
-unsigned g_tex[NUM_TEX+MAX_TEX];
+unsigned g_tex[NUM_TEX + NUM_MAP_TEX];
+unsigned char g_validMapTex[(NUM_MAP_TEX / 8) + 1];
+
+void createMapTex(uint id, const char *data, int size, int width, int height) 
+{
+	int comp;
+	unsigned char* image_data = stbi_load_from_memory(
+		(const unsigned char*) data, size, &width, &height, &comp, 0);
+
+	glGenTextures(1, &g_tex[id]);
+	glBindTexture(GL_TEXTURE_2D, g_tex[id]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	g_validMapTex[(id - NUM_TEX) / 8] |= 1 << (id - NUM_TEX) % 8;
+	free(image_data);
+}
+
+void destroyMapTex()
+{
+	for (uint i = 0; i < NUM_MAP_TEX; ++i)
+		if (g_validMapTex[i / 8] & (1 << i % 8))
+			glDeleteTextures(1, &g_tex[NUM_TEX + i]);
+
+	memset(g_validMapTex, 0, sizeof(g_validMapTex));
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -330,7 +369,7 @@ struct Object
 	int x, y;
 };
 
-struct texData 
+struct TexData
 {
 	int max_id;
 	int num_tiles;
@@ -339,7 +378,7 @@ struct texData
 struct World
 {
 	int ntextures;
-	struct texData Textures[MAX_TEXTURES];
+	struct TexData Textures[MAX_TEXTURES];
 
 	int crateTex;
 	int crateTargetTex;
@@ -903,7 +942,6 @@ int checkWinConditions()
 	return 1;
 }
 
-
 int getTileSize(int tile)
 {
 	for (int i = 0; i < g_world.ntextures; ++i)
@@ -923,7 +961,7 @@ int getTexCoords(int tile, float *vu, float *vv, float *tilesize)
 	*vv = (rel / size) * (1.f / size);
 	*vu = (rel % size) * (1.f / size);
 
-	return NUM_TEX + 1 + (tile / (size * size));
+	return NUM_TEX + tile / sqr(size);
 }
 
 void gamePlay(float elapse, unsigned* stage)
@@ -943,6 +981,8 @@ void gamePlay(float elapse, unsigned* stage)
 
 		if (!g_gameStart.loadGameOnStart)
 		{
+			destroyMapTex();
+
 			char* ext = strchr(g_map_progression[g_current_map].file, '.');
 
 			if (stricmp(ext, ".tmx") == 0)
@@ -1694,34 +1734,6 @@ struct read_progress
 	unsigned int readed;
 };
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-extern unsigned char *stbi_load_from_memory(
-		unsigned char const *buffer, int len, int *x, int *y, int *comp, int req_comp);
-
-#ifdef __cplusplus
-}
-#endif
-
-int loadTexture(const char *data, int size, int width, int height) 
-{
-	int comp;
-	unsigned char* image_data = stbi_load_from_memory(
-		(const unsigned char*) data, size, &width, &height, &comp, 0);
-	
-	//Now generate the OpenGL texture object
-	unsigned int texture;
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-	free(image_data);
-	return texture;
-}
-
 void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 {
 	// Tile properties
@@ -1778,23 +1790,27 @@ void loadMap_tmx(const char* path)
 		{
 			int gid = atoi(mxmlElementGetAttr(node, "firstgid"));
 			const char* tw = mxmlElementGetAttr(node, "tilewidth");
+
 			if(tw == NULL)
 				continue;
+
 			int tilesize = atoi(tw);
 			subnode = mxmlFindElement(node, tree, "image", NULL, NULL, MXML_DESCEND_FIRST);
+
 			const char* src = mxmlElementGetAttr(subnode, "source");
 			int w = atoi(mxmlElementGetAttr(subnode, "width"));
 			int h = atoi(mxmlElementGetAttr(subnode, "height"));
 
 			int num_subtextures = (w / tilesize);
-			int tex_id = NUM_TEX + 1 + gid/(num_subtextures*num_subtextures);
+			int tex_id = NUM_TEX + gid / sqr(num_subtextures);
 
 			sprintf(data_path, "%s%s", DATA_DIR, src);
+
 			char* img = loadFile(data_path, &n);
-			g_tex[tex_id] = loadTexture(img, n, w, h);
+			createMapTex(tex_id, img, n, w, h);
 			free(img);
 
-			g_world.Textures[g_world.ntextures].max_id = gid + (num_subtextures*num_subtextures);
+			g_world.Textures[g_world.ntextures].max_id = gid + sqr(num_subtextures);
 			g_world.Textures[g_world.ntextures].num_tiles = num_subtextures;
 			//printf("Texture with max_id %d contains %dx%d squares\n", g_world.Textures[g_world.ntextures].max_id, num_subtextures, num_subtextures);
 			g_world.ntextures++;
@@ -1812,18 +1828,12 @@ void loadMap_tmx(const char* path)
 			const char* name = mxmlElementGetAttr(node, "name");
 			subnode = mxmlFindElement(node, tree, "data", NULL, NULL, MXML_DESCEND_FIRST);
 			index2 = mxmlIndexNew(subnode, "tile", NULL);
-			int i = 0;
 
-			while((node2 = mxmlIndexEnum(index2)) != NULL)
-			{
-				g_world.tiles[g_world.nlayers][i++] = atoi(mxmlElementGetAttr(node2, "gid"));
-			}
+			for (unsigned i = 0; (node2 = mxmlIndexEnum(index2)) != NULL; ++i)
+				g_world.tiles[g_world.nlayers][i] = atoi(mxmlElementGetAttr(node2, "gid"));
 
 			if (stricmp("walls", name) == 0)
-			{
 				g_world.wallLayer = g_world.nlayers; 
-				printf("Found wall in layer %d, Malte stills hates XML\n", g_world.wallLayer);
-			}
 
 			g_world.nlayers++;
 			mxmlIndexDelete(index2);
