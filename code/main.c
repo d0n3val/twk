@@ -110,7 +110,7 @@
 #define buttonHeld(b) (g_buttons[0] & (1 << (b)))
 
 #if __linux__ || _MACOSX
-# define stricmp(s,t,n) strcasecmp((s), (t))
+# define stricmp(s,t) strcasecmp((s), (t))
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
