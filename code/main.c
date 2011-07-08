@@ -360,13 +360,26 @@ int g_current_map = 0;
 #define TILE_TARGET ('*')
 #define TILE_UNKNOWN ('?')
 
+#define MAX_FLOORS 4
+#define MAX_RAMPS 2
 #define MAX_CRATES 32
 #define MAX_LAYERS 10
 #define MAX_TEXTURES 20
 
-struct Object
+struct Crate
 {
 	int x, y;
+};
+
+struct Target
+{
+	int x, y;
+};
+
+struct Ramp
+{
+	int x, y;
+	int dir;
 };
 
 struct TexData
@@ -375,81 +388,95 @@ struct TexData
 	int num_tiles;
 };
 
-struct World
+struct Floor
 {
-	int ntextures;
-	struct TexData Textures[MAX_TEXTURES];
-
-	int crateTex;
-	int crateTargetTex;
 	int ncrates;
-	struct Object crates[MAX_CRATES];
+	struct Crate crates[MAX_CRATES];
 
 	int ntargets;
-	struct Object targets[MAX_CRATES];
+	struct Target targets[MAX_CRATES];
 
-	int startx, starty;
-	int nx, ny;
+	int nramps;
+	struct Ramp ramps[MAX_RAMPS];
+
 	int nlayers;
 	int wallLayer;
 	unsigned char tiles[MAX_LAYERS][4096];
 };
 
+struct World
+{
+	int ntextures;
+	struct TexData Textures[MAX_TEXTURES];
+	int crateTex;
+	int crateTargetTex;
+
+	int nx, ny;
+	int startx, starty;
+	int startFloor;
+
+	struct Floor floors[MAX_FLOORS];
+};
+
 struct World g_world;
 
-int worldTile(int layer, int x, int y)
+int worldTile(int fid, int layer, int x, int y)
 {
-	return x >= 0 && y >= 0 ? g_world.tiles[layer][y * g_world.nx + x] : TILE_UNKNOWN;
+	struct Floor* f = &g_world.floors[fid];
+
+	return x >= 0 && y >= 0 ? f->tiles[layer][y * g_world.nx + x] : TILE_UNKNOWN;
 }
 
-struct Object* worldCrates(int x, int y)
+struct Crate* worldCrates(int fid, int x, int y)
 {
-	for (int i = 0; i < g_world.ncrates; ++i)
-		if (g_world.crates[i].x == x && g_world.crates[i].y == y)
-			return &g_world.crates[i];
+	struct Floor* f = &g_world.floors[fid];
+
+	for (int i = 0; i < f->ncrates; ++i)
+		if (f->crates[i].x == x && f->crates[i].y == y)
+			return &f->crates[i];
 
 	return NULL;
 }
 
-struct Object* worldTargets(int x, int y)
+struct Target* worldTargets(int fid, int x, int y)
 {
-	for (int i = 0; i < g_world.ntargets; ++i)
-		if (g_world.targets[i].x == x && g_world.targets[i].y == y)
-			return &g_world.targets[i];
+	struct Floor* f = &g_world.floors[fid];
+
+	for (int i = 0; i < f->ntargets; ++i)
+		if (f->targets[i].x == x && f->targets[i].y == y)
+			return &f->targets[i];
 
 	return NULL;
 }
 
-int isWall(int x, int y)
+int isWall(int fid, int x, int y)
 {
-	int w = worldTile(g_world.wallLayer, x, y);
+	struct Floor* f = &g_world.floors[fid];
+	int w = worldTile(fid, f->wallLayer, x, y);
 
-	if (g_world.nlayers > 1)
+	if (f->nlayers > 1)
 		return w != 0;
 	else
 		return w == TILE_WALL || w == TILE_VOID;
 }
 
-int isWalkable(int x, int y)
+int isWalkable(int fid, int x, int y)
 {
-	int w = worldTile(g_world.wallLayer, x, y);
+	struct Floor* f = &g_world.floors[fid];
+	int w = worldTile(fid, f->wallLayer, x, y);
 
-	if (g_world.nlayers > 1)
+	if (f->nlayers > 1)
 		return w == 0;
 	else
 		return w == TILE_FLOOR || w == TILE_TARGET;
 }
 
-int isTargetTile(int x, int y)
+int isTargetTile(int fid, int x, int y)
 {
-	if (g_world.nlayers > 1)
-		return worldTargets(x,y) != NULL;
+	struct Floor* f = &g_world.floors[fid];
 
-	struct Object* target = &g_world.targets[g_world.ntargets];
-
-	while(target-- != g_world.targets)
-		if (target->x == x && target->y == y)
-			return 1;
+	if (f->nlayers > 1)
+		return worldTargets(fid, x, y) != NULL;
 
 	return 0;
 }
@@ -820,7 +847,8 @@ struct Timer
 
 struct UndoStep
 {
-	struct Object crates[MAX_CRATES];
+	struct Crate crates[MAX_CRATES];
+	int floorId;
 	int playerx, playery;
 };
 
@@ -832,6 +860,10 @@ struct GamePlay
 	float intro;
 	struct Timer timer;
 	struct Player player;
+	int floorId;
+	int targetFloor;
+	int floorChange;
+	float floorFade;
 	struct Move move;
 	int npath;
 	struct PathNode path[128];
@@ -899,7 +931,7 @@ int pathFind(int startx, int starty, int goalx, int goaly)
 			if (j < nclosed)
 				continue;
 
-			if (isWall(x, y) || worldCrates(x, y))
+			if (isWall(gp->floorId, x, y) || worldCrates(gp->floorId, x, y))
 				continue;
 
 			for (j = 0; j < nopen; ++j)
@@ -935,8 +967,12 @@ int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world
 
 int checkWinConditions()
 {
-	for (int i = 0; i < g_world.ncrates; ++i)
-		if (!isTargetTile(g_world.crates[i].x, g_world.crates[i].y))
+	struct GamePlay* gp = &g_gamePlay;
+	int fid = gp->floorId;
+	struct Floor* f = &g_world.floors[fid];
+
+	for (int i = 0; i < f->ncrates; ++i)
+		if (!isTargetTile(fid, f->crates[i].x, f->crates[i].y))
 			return 0;
 
 	return 1;
@@ -993,6 +1029,10 @@ void gamePlay(float elapse, unsigned* stage)
 			playMusic(g_map_progression[g_current_map].music);
 		}
 
+		gp->floorId = g_world.startFloor;
+		gp->targetFloor = g_world.startFloor;
+		gp->floorFade = 1.f;
+
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
 		p->path = -1;
@@ -1007,7 +1047,7 @@ void gamePlay(float elapse, unsigned* stage)
 		}
 	}
 
-	int winConditions = checkWinConditions();
+	int winConditions = gp->floorId != gp->targetFloor ? 0 : checkWinConditions();
 
 	if (winConditions == 1) 
 	{
@@ -1069,17 +1109,22 @@ void gamePlay(float elapse, unsigned* stage)
 			m->dy = 0;
 		}
 
+		struct Floor* f = &g_world.floors[gp->floorId];
+
 		p->ix = p->x = gp->steps[gp->moves].playerx;
 		p->iy = p->y = gp->steps[gp->moves].playery;
-		memcpy(g_world.crates, gp->steps[gp->moves].crates, sizeof(struct Object) * g_world.ncrates);
+		memcpy(f->crates, gp->steps[gp->moves].crates, sizeof(struct Crate) * f->ncrates);
 	}
 
 	if (gp->stepSaved == 0)
 	{
+		struct Floor* f = &g_world.floors[gp->floorId];
+
 		gp->stepSaved = 1;
+		gp->steps[gp->moves].floorId = gp->floorId;
 		gp->steps[gp->moves].playerx = p->x;
 		gp->steps[gp->moves].playery = p->y;
-		memcpy(gp->steps[gp->moves].crates, g_world.crates, sizeof(struct Object) * g_world.ncrates);
+		memcpy(gp->steps[gp->moves].crates, f->crates, sizeof(struct Crate) * f->ncrates);
 	}
 
 	if (p->path >= 0 || p->move)
@@ -1090,7 +1135,8 @@ void gamePlay(float elapse, unsigned* stage)
 
 	if (buttonDown(0))
 	{
-		struct Object* crate = worldCrates(mx, my);
+		struct Crate* crate = worldCrates(gp->floorId, mx, my);
+		struct Floor* f = &g_world.floors[gp->floorId];
 
 		m->x0 = -1;
 		m->y0 = -1;
@@ -1099,7 +1145,7 @@ void gamePlay(float elapse, unsigned* stage)
 		{
 			m->x0 = mx;
 			m->y0 = my;
-			m->ci = crate - g_world.crates;
+			m->ci = crate - f->crates;
 		}
 	}
 
@@ -1114,7 +1160,7 @@ void gamePlay(float elapse, unsigned* stage)
 			int n = max(mx, m->x0 - 1);
 
 			for (; i < n + 1; ++i)
-				if (!isWalkable(i, my))
+				if (!isWalkable(gp->floorId, i, my))
 					break;
 
 			if (i > n)
@@ -1129,7 +1175,7 @@ void gamePlay(float elapse, unsigned* stage)
 			int n = max(my, m->y0 - 1);
 
 			for (; i < n + 1; ++i)
-				if (!isWalkable(mx, i))
+				if (!isWalkable(gp->floorId, mx, i))
 					break;
 
 			if (i > n)
@@ -1254,11 +1300,13 @@ ignore_mouse_input:
 		}
 		else if (p->move)
 		{
+			struct Floor* f = &g_world.floors[gp->floorId];
+
 			m->x0 -= m->dx;
 			m->y0 -= m->dy;
 
-			g_world.crates[m->ci].x -= m->dx;
-			g_world.crates[m->ci].y -= m->dy;
+			f->crates[m->ci].x -= m->dx;
+			f->crates[m->ci].y -= m->dy;
 
 			p->ix = (p->x -= m->dx) - m->dx;
 			p->iy = (p->y -= m->dy) - m->dy;
@@ -1270,6 +1318,27 @@ ignore_mouse_input:
 				p->move = 0;
 				++gp->moves;
 				gp->stepSaved = 0;
+
+				for (int i = 0; i < f->nramps; ++i)
+					if (m->x1 == f->ramps[i].x && m->y1 == f->ramps[i].y)
+					{
+						int fid = gp->floorId + f->ramps[i].dir;
+						struct Floor* f2 = &g_world.floors[fid];
+
+						memcpy(
+							&f2->crates[f2->ncrates++],
+							&f->crates[m->ci],
+							sizeof(struct Crate));
+
+						if (--f->ncrates > 0)
+							memcpy(
+								&f->crates[m->ci],
+								&f->crates[f->ncrates],
+								sizeof(struct Crate));
+
+						gp->targetFloor = fid;
+						gp->floorChange = f->ramps[i].dir;
+					}
 
 				m->x0 = -1;
 				m->y0 = -1;
@@ -1283,7 +1352,7 @@ ignore_mouse_input:
 				{
 					BASS_ChannelStop(p->sound_channel);
 
-					if (isTargetTile(g_world.crates[m->ci].x, g_world.crates[m->ci].y))
+					if (isTargetTile(gp->floorId, f->crates[m->ci].x, f->crates[m->ci].y))
 					{
 						p->sound_channel = BASS_SampleGetChannel(g_successSample, 0);
 						BASS_ChannelPlay(p->sound_channel, 1);
@@ -1294,28 +1363,59 @@ ignore_mouse_input:
 		}
 	}
 
+	if (gp->targetFloor != gp->floorId && gp->floorFade == 0.f)
+		gp->floorFade = 1.f;
+
+	if (gp->floorFade != 0.f)
+		if ((gp->floorFade -= elapse * .75f) <= 0.f)
+		{
+			gp->floorId = gp->targetFloor;
+			gp->floorFade = 0.f;
+		}
+
 	if (keyDown('0'))
 	{
 		srand(time(0) ^ g_map_progression[g_current_map].seed);
 		g_map_progression[g_current_map].seed = (int) (rand() / (float) RAND_MAX * 3333.f);
 	}
 
-	srand(g_map_progression[g_current_map].seed);
 	gprintf(.9f, .07f, 0x00ff00ff, "SEED %d", g_map_progression[g_current_map].seed);
 
+	int myFloorId = gp->floorId;
+
+render_floor:
+
+	srand(g_map_progression[g_current_map].seed);
 	const float vx = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 	const float vy = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 
-	for (int n = 0; n < g_world.nlayers; ++n)
+	glPushMatrix();
+
+	if (myFloorId != gp->targetFloor)
+	{
+		glTranslatef(0.f, (float) gp->floorChange * -g_height * .25f * (1.f - gp->floorFade), 0.f);
+		glColor4f(1.f, 1.f, 1.f, gp->floorFade);
+	}
+	else if (gp->floorFade != 0.f)
+	{
+		glTranslatef(0.f, (float) gp->floorChange * g_height * .25f * gp->floorFade, 0.f);
+		glColor4f(1.f, 1.f, 1.f, 1.f - gp->floorFade);
+	}
+	else
+		glColor4f(1.f, 1.f, 1.f, 1.f);
+
+	struct Floor* f = &g_world.floors[myFloorId];
+
+	for (int n = 0; n < f->nlayers; ++n)
 	{
 		for (int y = 0; y < g_world.ny; ++y)
 		{
 			for (int x = 0; x < g_world.nx; ++x)
 			{
 				float vu,vv;
-				const int tile = worldTile(n, x, y);
+				const int tile = worldTile(myFloorId, n, x, y);
 
-				if (g_world.nlayers > 1 && tile > 0)
+				if (f->nlayers > 1 && tile > 0)
 				{
 					float tilesize;
 					int id = getTexCoords(tile, &vu, &vv, &tilesize);
@@ -1359,15 +1459,20 @@ ignore_mouse_input:
 		}
 	}
 
+	if (myFloorId != gp->targetFloor)
+		glColor4f(1.f, 1.f, 1.f, gp->floorFade);
+	else
+		glColor4f(1.f, 1.f, 1.f, 1.f - gp->floorFade);
+
 	const int dx = p->ix - p->x;
 	const int dy = p->iy - p->y;
 	const float ix = dx * ss * (p->time / p->speed);
 	const float iy = dy * ss * (p->time / p->speed);
 
-	for (int i = 0; i < g_world.ncrates; ++i)
+	for (int i = 0; i < f->ncrates; ++i)
 	{
-		const int x = g_world.crates[i].x;
-		const int y = g_world.crates[i].y;
+		const int x = f->crates[i].x;
+		const int y = f->crates[i].y;
 		float xx = posX(x, ss);
 		float yy = posY(y, ss);
 		float sm = 1.f;
@@ -1385,10 +1490,10 @@ ignore_mouse_input:
 		const float ss2 = ss * .5f + ss * (cosf(t) + 1.f) * .5f;
 		const float ss3 = w * ss + (1.f - w) * ss2;
 
-		if (g_world.nlayers > 1 && g_world.crateTex != 0)
+		if (f->nlayers > 1 && g_world.crateTex != 0)
 		{
 			int tex = g_world.crateTex;
-			if (isTargetTile(x,y) && g_world.crateTargetTex != 0)
+			if (isTargetTile(gp->floorId, x, y) && g_world.crateTargetTex != 0)
 				tex = g_world.crateTargetTex;
 
 			float vv, vu, tilesize;
@@ -1397,6 +1502,14 @@ ignore_mouse_input:
 		}
 		else
 			sprite(xx, yy, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
+	}
+
+	glPopMatrix();
+
+	if (gp->floorId != gp->targetFloor && myFloorId == gp->floorId)
+	{
+		myFloorId = gp->targetFloor;
+		goto render_floor;
 	}
 
 	const float s = dx || dy ? clamp(p->time / p->speed, 0.f, 1.f) : .25f;
@@ -1452,6 +1565,8 @@ ignore_mouse_input:
 		float rysize = (size*.37f) / g_height;
 		gprintf(0.5 - rxsize, 0.5 - rysize, 0x00ffffff, "* LEVEL COMPLETED *");
 		gprintf(0.5 - rxsize, 0.5 - rysize + 0.05f, 0x00ffffff, " Click to continue");
+
+		glColor3f(1.f, 1.f, 1.f);
 
 		float u0, v0, u1, v1;
 		u0 = .5f, u1 = u0 + .125f;
@@ -1558,7 +1673,7 @@ void quad(float x, float y, float s, unsigned c)
 
 void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1)
 {
-	glColor3f(1.f, 1.f, 1.f);
+//	glColor3f(1.f, 1.f, 1.f);
 
 	glPushMatrix();
 	glTranslatef(x, y, 0.f);
@@ -1666,6 +1781,7 @@ void onDisplay()
 	glClearColor(.1f, .1f, .3f, 0.f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
+	glColor4f(1.f, 1.f, 1.f, 1.f);
 	renderGame(elapse);
 
 	// render font
@@ -1759,98 +1875,126 @@ void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 			printf("Unknown property for tile %d named [%s], blame Tony\n", id, name);
 
 		mxmlDelete(property);
+		mxmlDelete(node);
 	}
+
 	mxmlIndexDelete(index);		
 }
 
 void loadMap_tmx(const char* path)
 {
-		int n = 0;
-		char data_path[PATH_NAME_SIZE] = DATA_DIR;
-		char* data = loadFile(strcat(data_path, path), &n);
+	int n = 0;
+	char data_path[PATH_NAME_SIZE] = DATA_DIR;
+	char* data = loadFile(strcat(data_path, path), &n);
 
-		memset(&g_world, 0, sizeof(g_world));
+	memset(&g_world, 0, sizeof(g_world));
 
-		mxml_node_t *tree = mxmlLoadString(NULL, data, MXML_TEXT_CALLBACK);
-		mxml_node_t *map = mxmlFindElement(tree, tree, "map", NULL, NULL, MXML_DESCEND_FIRST);
+	mxml_node_t *tree = mxmlLoadString(NULL, data, MXML_TEXT_CALLBACK);
+	mxml_node_t *map = mxmlFindElement(tree, tree, "map", NULL, NULL, MXML_DESCEND_FIRST);
 
-		g_world.nx = atoi(mxmlElementGetAttr(map, "width"));
-		g_world.ny = atoi(mxmlElementGetAttr(map, "height"));
-		int tilesize = atoi(mxmlElementGetAttr(map, "tilewidth"));
+	g_world.nx = atoi(mxmlElementGetAttr(map, "width"));
+	g_world.ny = atoi(mxmlElementGetAttr(map, "height"));
+	int tilesize = atoi(mxmlElementGetAttr(map, "tilewidth"));
 
-		printf("Map of %dx%d, tile size: %d, approved by Senta\n", g_world.nx, g_world.ny, tilesize); 
+	mxml_index_t *index, *index2, *index3;
+	mxml_node_t *node, *subnode, *node2;
 
-		mxml_index_t *index, *index2;
-		mxml_node_t *node, *subnode, *node2;
+	// Tileset loading ---
 
-		// Tileset loading ---
-		index = mxmlIndexNew(map, "tileset", NULL);
+	index = mxmlIndexNew(map, "tileset", NULL);
 
-		while((node = mxmlIndexEnum(index)) != NULL)
-		{
-			int gid = atoi(mxmlElementGetAttr(node, "firstgid"));
-			const char* tw = mxmlElementGetAttr(node, "tilewidth");
+	while((node = mxmlIndexEnum(index)) != NULL)
+	{
+		int gid = atoi(mxmlElementGetAttr(node, "firstgid"));
+		const char* tw = mxmlElementGetAttr(node, "tilewidth");
 
-			if(tw == NULL)
-				continue;
+		if(tw == NULL)
+			continue;
 
-			int tilesize = atoi(tw);
-			subnode = mxmlFindElement(node, tree, "image", NULL, NULL, MXML_DESCEND_FIRST);
+		int tilesize = atoi(tw);
+		subnode = mxmlFindElement(node, tree, "image", NULL, NULL, MXML_DESCEND_FIRST);
 
-			const char* src = mxmlElementGetAttr(subnode, "source");
-			int w = atoi(mxmlElementGetAttr(subnode, "width"));
-			int h = atoi(mxmlElementGetAttr(subnode, "height"));
+		const char* src = mxmlElementGetAttr(subnode, "source");
+		int w = atoi(mxmlElementGetAttr(subnode, "width"));
+		int h = atoi(mxmlElementGetAttr(subnode, "height"));
 
-			int num_subtextures = (w / tilesize);
-			int tex_id = NUM_TEX + gid / sqr(num_subtextures);
+		int num_subtextures = (w / tilesize);
+		int tex_id = NUM_TEX + gid / sqr(num_subtextures);
 
-			sprintf(data_path, "%s%s", DATA_DIR, src);
+		sprintf(data_path, "%s%s", DATA_DIR, src);
 
-			char* img = loadFile(data_path, &n);
-			createMapTex(tex_id, img, n, w, h);
-			free(img);
+		char* img = loadFile(data_path, &n);
+		createMapTex(tex_id, img, n, w, h);
+		free(img);
 
-			g_world.Textures[g_world.ntextures].max_id = gid + sqr(num_subtextures);
-			g_world.Textures[g_world.ntextures].num_tiles = num_subtextures;
-			//printf("Texture with max_id %d contains %dx%d squares\n", g_world.Textures[g_world.ntextures].max_id, num_subtextures, num_subtextures);
-			g_world.ntextures++;
+		g_world.Textures[g_world.ntextures].max_id = gid + sqr(num_subtextures);
+		g_world.Textures[g_world.ntextures].num_tiles = num_subtextures;
+		g_world.ntextures++;
 
-			loadTileProperties(node, tree);
-			mxmlDelete(subnode);
-		}
-		mxmlIndexDelete(index);		
+		loadTileProperties(node, tree);
+		mxmlDelete(subnode);
+		mxmlDelete(node);
+	}
 
-		// Layer loading ---
-		index = mxmlIndexNew(map, "layer", NULL);
+	mxmlIndexDelete(index);
 
-		while((node = mxmlIndexEnum(index)) != NULL)
-		{
-			const char* name = mxmlElementGetAttr(node, "name");
-			subnode = mxmlFindElement(node, tree, "data", NULL, NULL, MXML_DESCEND_FIRST);
-			index2 = mxmlIndexNew(subnode, "tile", NULL);
+	// Layer loading ---
 
-			for (unsigned i = 0; (node2 = mxmlIndexEnum(index2)) != NULL; ++i)
-				g_world.tiles[g_world.nlayers][i] = atoi(mxmlElementGetAttr(node2, "gid"));
+	index = mxmlIndexNew(map, "layer", NULL);
 
-			if (stricmp("walls", name) == 0)
-				g_world.wallLayer = g_world.nlayers; 
+	int nfloors = 0;
 
-			g_world.nlayers++;
-			mxmlIndexDelete(index2);
-			mxmlDelete(subnode);
-		}
-		mxmlIndexDelete(index);
+	while((node = mxmlIndexEnum(index)) != NULL)
+	{
+		const char* name = mxmlElementGetAttr(node, "name");
+		subnode = mxmlFindElement(node, tree, "data", NULL, NULL, MXML_DESCEND_FIRST);
+		index2 = mxmlIndexNew(subnode, "tile", NULL);
 
-		// Objects loading ---
-		// Only supports one ¨objectgroup¨. Inside it only 3 types of objects are valid:
-		// - start: position were the player starts
-		// - crate: a crate will be created in that position
-		// - target: all targets need to have a crate in order to finish a level
+		char bare[32] = {0};
+		int fid = 1;
+		sscanf(name, "%31[A-Za-z]-%d", bare, &fid);
+		nfloors = max(nfloors, fid);
+		fid -= 1;
 
-		mxml_node_t *objectsgroup = mxmlFindElement(map, tree, "objectgroup", NULL, NULL, MXML_DESCEND_FIRST);
-		index = mxmlIndexNew(objectsgroup, "object", NULL);
+		struct Floor* f = &g_world.floors[fid];
 
-		while((node = mxmlIndexEnum(index)) != NULL)
+		for (unsigned i = 0; (node2 = mxmlIndexEnum(index2)) != NULL; ++i)
+			f->tiles[f->nlayers][i] = atoi(mxmlElementGetAttr(node2, "gid"));
+
+		if (stricmp("walls", bare) == 0)
+			f->wallLayer = f->nlayers; 
+
+		f->nlayers++;
+		mxmlIndexDelete(index2);
+		mxmlDelete(subnode);
+		mxmlDelete(node);
+	}
+
+	mxmlIndexDelete(index);
+
+	// Objects loading ---
+	// Only supports one ¨objectgroup¨. Inside it only 3 types of objects are valid:
+	// - start: position were the player starts
+	// - crate: a crate will be created in that position
+	// - target: all targets need to have a crate in order to finish a level
+
+	index2 = mxmlIndexNew(map, "objectgroup", NULL);
+
+	while((node2 = mxmlIndexEnum(index)) != NULL)
+	{
+		const char* name = mxmlElementGetAttr(node2, "name");
+
+		char bare[32] = {0};
+		int fid = 1;
+		sscanf(name, "%31[A-Za-z]-%d", bare, &fid);
+		fid -= 1;
+		assert(fid >= 0 && fid < nfloors);
+
+		struct Floor* f = &g_world.floors[fid];
+
+		index3 = mxmlIndexNew(node2, "object", NULL);
+
+		while((node = mxmlIndexEnum(index3)) != NULL)
 		{
 			int x = atoi(mxmlElementGetAttr(node, "x")) / tilesize;
 			int y = atoi(mxmlElementGetAttr(node, "y")) / tilesize;
@@ -1860,27 +2004,49 @@ void loadMap_tmx(const char* path)
 			{
 				g_world.startx = x;
 				g_world.starty = y;
+				g_world.startFloor = fid;
+			}
+			else if (stricmp(type, "crate") == 0)
+			{
+				f->crates[f->ncrates].x = x;
+				f->crates[f->ncrates].y = y;
+				f->ncrates++;
+			}
+			else if (stricmp(type, "target") == 0)
+			{
+				f->targets[f->ntargets].x = x;
+				f->targets[f->ntargets].y = y;
+				f->ntargets++;
+			}
+			else if (stricmp(type, "ramp-up") == 0)
+			{
+				f->ramps[f->nramps].x = x;
+				f->ramps[f->nramps].y = y;
+				f->ramps[f->nramps].dir = 1;
+				f->nramps++;
+			}
+			else if (stricmp(type, "ramp-down") == 0)
+			{
+				f->ramps[f->nramps].x = x;
+				f->ramps[f->nramps].y = y;
+				f->ramps[f->nramps].dir = -1;
+				f->nramps++;
 			}
 
-			if (stricmp(type, "crate") == 0)
-			{
-				g_world.crates[g_world.ncrates].x = x;
-				g_world.crates[g_world.ncrates].y = y;
-				g_world.ncrates++;
-			}
-
-			if (stricmp(type, "target") == 0)
-			{
-				g_world.targets[g_world.ntargets].x = x;
-				g_world.targets[g_world.ntargets].y = y;
-				g_world.ntargets++;
-			}
+			mxmlDelete(node);
 		}
-		mxmlIndexDelete(index);
 
-		// ----------------------
-		mxmlDelete(tree);
-		free(data);
+		mxmlIndexDelete(index3);
+		mxmlDelete(node2);
+	}
+
+	mxmlIndexDelete(index2);
+
+	// ----------------------
+
+	mxmlDelete(map);
+	mxmlDelete(tree);
+	free(data);
 }
 
 void loadMap(const char* path)
@@ -1891,9 +2057,10 @@ void loadMap(const char* path)
 
 		memset(&g_world, 0, sizeof(g_world));
 
-		struct Object* crate = g_world.crates;
-		struct Object* target = g_world.targets;
-		unsigned char* dst = g_world.tiles[0];
+		struct Floor* f = &g_world.floors[0];
+		struct Crate* crate = f->crates;
+		struct Target* target = f->targets;
+		unsigned char* dst = f->tiles[0];
 		char* src = data;
 
 		for (int i = 0, x = 0; i < n; ++i)
@@ -1919,9 +2086,9 @@ void loadMap(const char* path)
 			g_world.nx = max(g_world.nx, x);
 		}
 
-		g_world.ncrates = crate - g_world.crates;
-		g_world.ntargets = target - g_world.targets;
-		g_world.nlayers = 1;
+		f->ncrates = crate - f->crates;
+		f->ntargets = target - f->targets;
+		f->nlayers = 1;
 		free(data);
 }
 
