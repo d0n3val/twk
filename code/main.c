@@ -30,6 +30,7 @@
 #include <string.h>
 #if _WIN32
 # include "bass/bass.h"
+# define uint unsigned int
 #endif
 #if __linux__ || _WIN32
 # include "mxml/mxml.h"
