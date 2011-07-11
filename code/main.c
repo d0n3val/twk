@@ -1981,7 +1981,7 @@ void loadMap_tmx(const char* path)
 
 	index2 = mxmlIndexNew(map, "objectgroup", NULL);
 
-	while((node2 = mxmlIndexEnum(index)) != NULL)
+	while((node2 = mxmlIndexEnum(index2)) != NULL)
 	{
 		const char* name = mxmlElementGetAttr(node2, "name");
 
