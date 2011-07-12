@@ -36,6 +36,9 @@
 # include "mxml/mxml.h"
 #endif
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -129,6 +132,17 @@ extern unsigned char *stbi_load_from_memory(
 
 ///////////////////////////////////////////////////////////////////////////////
 
+struct Pref
+{
+	char name[16];
+	char value[64];
+};
+
+unsigned g_nprefs;
+struct Pref g_prefs[32];
+
+///////////////////////////////////////////////////////////////////////////////
+
 typedef float vec3[3];
 typedef float vec4[4];
 typedef float mat4[16];
@@ -205,34 +219,11 @@ unsigned g_buttons[2];
 int g_mousex;
 int g_mousey;
 
-int g_fontList;
-const unsigned g_font[] =
-{
-	0x00000000, 0x00000000, 0x00000800, 0x08080808, 0x00000000, 0x14141400, 0x3e141400, 0x14143e14,
-	0x0a3c0800, 0x081e281c, 0x10260600, 0x30320408, 0x2a241a00, 0x10282810, 0x00000000, 0x02040800,
-	0x08040200, 0x02040808, 0x08102000, 0x20100808, 0x1c2a0800, 0x082a1c08, 0x08080000, 0x0008083e,
-	0x00080810, 0x00000000, 0x00000000, 0x0000003e, 0x00181800, 0x00000000, 0x10200000, 0x00020408,
-	0x32221c00, 0x1c22262a, 0x08083e00, 0x08182808, 0x18203e00, 0x1c220204, 0x02221c00, 0x1c22020c,
-	0x3e040400, 0x040c1424, 0x02221c00, 0x3e203c02, 0x22221c00, 0x0c10203c, 0x08080800, 0x3e220408,
-	0x22221c00, 0x1c22221c, 0x02041800, 0x1c22221e, 0x00080000, 0x00000800, 0x00080810, 0x00000800,
-	0x180c0600, 0x060c1830, 0x3e000000, 0x00003e00, 0x0c183000, 0x30180c06, 0x08000800, 0x1c220204,
-	0x2e201c00, 0x1c222e2a, 0x3e222200, 0x08142222, 0x12123c00, 0x3c12123c, 0x20120c00, 0x0c122020,
-	0x12143800, 0x38141212, 0x20203e00, 0x3e20203c, 0x20202000, 0x3e20203c, 0x22221c00, 0x1c22202e,
-	0x22222200, 0x2222223e, 0x08081c00, 0x1c080808, 0x04241800, 0x0e040404, 0x28242200, 0x22242830,
-	0x20203e00, 0x20202020, 0x22222200, 0x22362a2a, 0x26262200, 0x2232322a, 0x22221c00, 0x1c222222,
-	0x20202000, 0x3c22223c, 0x2a241a00, 0x1c222222, 0x28242200, 0x3c22223c, 0x02221c00, 0x1c22201c,
-	0x08080800, 0x3e080808, 0x22221c00, 0x22222222, 0x14140800, 0x22222222, 0x2a362200, 0x2222222a,
-	0x14222200, 0x22221408, 0x08080800, 0x2222221c, 0x10203e00, 0x3e020408, 0x08080e00, 0x0e080808,
-	0x04020000, 0x00201008, 0x08083800, 0x38080808, 0x00000000, 0x08142200, 0x00003e00, 0x00000000,
-	0x00000000, 0x00000000, 0x1e221e00, 0x00001c02, 0x22322c00, 0x20202c32, 0x20221c00, 0x00001c22,
-	0x22261a00, 0x02021a26, 0x3e201c00, 0x00001c22, 0x08080800, 0x040a083e, 0x261a021c, 0x00001a26,
-	0x22222200, 0x20202c32, 0x08081c00, 0x08001808, 0x08084830, 0x08001808, 0x30282400, 0x20202428,
-	0x08081c00, 0x18080808, 0x2a2a2a00, 0x0000342a, 0x22222200, 0x00002c32, 0x22221c00, 0x00001c22,
-	0x322c2020, 0x00002c32, 0x261a0202, 0x00001a26, 0x20202000, 0x00002c32, 0x3c023c00, 0x00001e20,
-	0x10120c00, 0x10103c10, 0x24241a00, 0x00002424, 0x22140800, 0x00002222, 0x2a2a1400, 0x0000222a,
-	0x08142200, 0x00002214, 0x261a021c, 0x00002222, 0x08103e00, 0x00003e04, 0x10100c00, 0x0c101020,
-	0x08080800, 0x08080808, 0x08083000, 0x30080804, 0x00000000, 0x3e000000, 0x00000000, 0x00000000
-};
+///////////////////////////////////////////////////////////////////////////////
+
+stbtt_bakedchar g_fontData[96];
+unsigned g_fontTex;
+float g_fontSpace;
 
 struct Text
 {
@@ -304,7 +295,7 @@ const char* g_texnames[] =
 unsigned g_tex[NUM_TEX + NUM_MAP_TEX];
 unsigned char g_validMapTex[(NUM_MAP_TEX / 8) + 1];
 
-void createMapTex(uint id, const char *data, int size, int width, int height) 
+void createMapTex(unsigned id, const char *data, int size, int width, int height) 
 {
 	int comp;
 	unsigned char* image_data = stbi_load_from_memory(
@@ -321,7 +312,7 @@ void createMapTex(uint id, const char *data, int size, int width, int height)
 
 void destroyMapTex()
 {
-	for (uint i = 0; i < NUM_MAP_TEX; ++i)
+	for (unsigned i = 0; i < NUM_MAP_TEX; ++i)
 		if (g_validMapTex[i / 8] & (1 << i % 8))
 			glDeleteTextures(1, &g_tex[NUM_TEX + i]);
 
@@ -769,9 +760,9 @@ void gameStart(float elapse, unsigned* stage)
 	unsigned color = colors[gs->state];
 
 	gprintf(.5f, .5f, 0x00ff00ff, "Touchy Warehouse Keeper");
-	gprintf(.5f, .52f, 0x00ff00ff, "v0.1");
-	gprintf(.5f, .56f, 0x00ff00ff, "Map (right click to cycle): %s", g_map_progression[g_current_map].name);
-	gprintf(.5f, .60f, color, "Click to continue");
+	gprintf(.5f, .5f + g_fontSpace, 0x00ff00ff, "v0.1");
+	gprintf(.5f, .5f + g_fontSpace * 3.f, 0x00ff00ff, "Map (right click to cycle): %s", g_map_progression[g_current_map].name);
+	gprintf(.5f, .5f + g_fontSpace * 5.f, color, "Click to continue");
 
 	if (gs->hasSaveGame)
 		gprintf(.02f, .95f, 0x00ffffff, "[C]ONTINUE");
@@ -1048,6 +1039,9 @@ void gamePlay(float elapse, unsigned* stage)
 		}
 	}
 
+	const int mx = unposX(g_mousex, ss);
+	const int my = unposY(g_mousey, ss);
+
 	int winConditions = gp->floorId != gp->targetFloor ? 0 : checkWinConditions();
 
 	if (winConditions == 1) 
@@ -1130,9 +1124,6 @@ void gamePlay(float elapse, unsigned* stage)
 
 	if (p->path >= 0 || p->move)
 		goto ignore_mouse_input;
-
-	const int mx = unposX(g_mousex, ss);
-	const int my = unposY(g_mousey, ss);
 
 	if (buttonDown(0))
 	{
@@ -1380,7 +1371,7 @@ ignore_mouse_input:
 		g_map_progression[g_current_map].seed = (int) (rand() / (float) RAND_MAX * 3333.f);
 	}
 
-	gprintf(.9f, .07f, 0x00ff00ff, "SEED %d", g_map_progression[g_current_map].seed);
+	gprintf(.9f, .05f + g_fontSpace, 0x00ff00ff, "SEED %d", g_map_progression[g_current_map].seed);
 
 	int myFloorId = gp->floorId;
 
@@ -1536,9 +1527,9 @@ render_floor:
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
 
 	gprintf(.02f, .05f, 0x00ffffff, "LEVEL: %s", g_map_progression[g_current_map].name);
-	gprintf(.02f, .07f, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
-	gprintf(.02f, .09f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
-	gprintf(.02f, .95f, 0x00ffffff, "[U]NDO [P]AUSE  [R]ESTART");
+	gprintf(.02f, .05f + g_fontSpace, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
+	gprintf(.02f, .05f + g_fontSpace * 2.f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
+	gprintf(.02f, .95f, 0x00ffffff, "[U]NDO   [P]AUSE   [R]ESTART");
 
 	if (g_map_progression[g_current_map].txt[0] != 0) 
 	{
@@ -1550,7 +1541,7 @@ render_floor:
 		while(tok != NULL)
 		{
 			gprintf(0.5f - (strlen(tok) * 0.005f), row, 0x00ffffff, tok);
-			row += 0.02f;
+			row += g_fontSpace;
 			tok = strtok(NULL, "^");
 		}
 	}
@@ -1578,7 +1569,7 @@ render_floor:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct
+struct GameOver
 {
 	float time;
 	int count;
@@ -1600,7 +1591,7 @@ void gameOver(float elapse, unsigned* stage)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct
+struct Stage
 {
 	void* data;
 	size_t size;
@@ -1787,24 +1778,38 @@ void onDisplay()
 
 	// render font
 
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, g_fontTex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glBegin(GL_QUADS);
+
 	for (
 		struct Text* t = (struct Text*) g_textBuffer;
 		t != (struct Text*) g_textEnd;
 		t = (struct Text*) &t->string[t->length + 1])
 	{
-		glPushAttrib(GL_LIST_BIT);
-		glListBase(g_fontList);
+		float x = g_width * t->x;
+		float y = g_height * t->y;
 
-		glColor4ub(0, 0, 0, 0);
-		glRasterPos2i((int) (g_width * t->x) + 1, (int) (g_height * t->y) + 1);
-		glCallLists(t->length, GL_UNSIGNED_BYTE, t->string);
+		for (unsigned i = 0, n = t->length; i < n; ++i)
+		{
+			stbtt_aligned_quad q;
+			stbtt_GetBakedQuad(g_fontData, 512, 512, t->string[i] - 32, &x, &y, &q, 1);
 
-		glColor4ubv((unsigned char*) &t->color);
-		glRasterPos2i((int) (g_width * t->x), (int) (g_height * t->y));
-		glCallLists(t->length, GL_UNSIGNED_BYTE, t->string);
-
-		glPopAttrib();
+			glTexCoord2f(q.s0, q.t0); glVertex2f(q.x0, q.y0);
+			glTexCoord2f(q.s1, q.t0); glVertex2f(q.x1, q.y0);
+			glTexCoord2f(q.s1, q.t1); glVertex2f(q.x1, q.y1);
+			glTexCoord2f(q.s0, q.t1); glVertex2f(q.x0, q.y1);
+		}
 	}
+
+	glEnd();
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_BLEND);
 
 	g_textEnd = g_textBuffer;
 
@@ -2210,6 +2215,25 @@ void loadConfig(const char* path)
 	g_map_progression[++map].par = -1; // watermark
 }
 
+void loadFont(const char* name, unsigned size)
+{
+	char path[256];
+	snprintf(path, 256, "data/%s", name);
+
+	int n;
+	unsigned char* data = (unsigned char*) loadFile(path, &n);
+	unsigned char* tmp = (unsigned char*) malloc(512 * 512);
+
+	stbtt_BakeFontBitmap(data, 0, (float) size, tmp, 512, 512, 32, 96, g_fontData);
+
+	glGenTextures(1, &g_fontTex);
+	glBindTexture(GL_TEXTURE_2D, g_fontTex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 512, 512, 0, GL_ALPHA, GL_UNSIGNED_BYTE, tmp);
+
+	free(data);
+	free(tmp);
+}
+
 void onFile(char* path)
 {
 	char* ext;
@@ -2245,6 +2269,16 @@ void onFile(char* path)
 	else if (stricmp(ext, ".cfg") == 0)
 	{
 		loadConfig(path);
+	}
+	else if (stricmp(ext, ".txt") == 0)
+	{
+		FILE* fd = fopen(path, "rb");
+
+		for (; g_nprefs < arrayCount(g_prefs); ++g_nprefs)
+			if (fscanf(fd, "%15s = %63s", g_prefs[g_nprefs].name, g_prefs[g_nprefs].value) == EOF)
+				break;
+
+		fclose(fd);
 	}
 }
 
@@ -2285,20 +2319,6 @@ void init(int* argc, char* argv[])
 
 	glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
 
-	// init font
-
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	g_fontList = glGenLists(256);
-
-	for (int i = 0, j = ' '; j < 256; i += 2, ++j)
-	{
-		glNewList(g_fontList + j, GL_COMPILE);
-		glBitmap(8, 8, 0.f, 0.f, 8.f, 0.f, (unsigned char*) &g_font[i]);
-		glEndList();
-	}
-
-	g_textEnd = g_textBuffer;
-
 	// init bass
 
 #if _WIN32 || _MACOSX
@@ -2311,6 +2331,24 @@ void init(int* argc, char* argv[])
 	// load data
 
 	_foreach_file("data", onFile);
+
+	// init font
+
+	char* fontName = NULL;
+	unsigned fontSize = 16;
+
+	for (unsigned i = 0, n = g_nprefs; i < n; ++i)
+		if (stricmp(g_prefs[i].name, "font-name") == 0)
+			fontName = g_prefs[i].value;
+		else if (stricmp(g_prefs[i].name, "font-size") == 0)
+			fontSize = atoi(g_prefs[i].value);
+		else if (stricmp(g_prefs[i].name, "font-space") == 0)
+			g_fontSpace = atof(g_prefs[i].value);
+
+	if (fontName != NULL)
+		loadFont(fontName, fontSize);
+
+	g_textEnd = g_textBuffer;
 }
 
 void end()
