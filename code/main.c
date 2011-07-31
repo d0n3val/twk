@@ -35,9 +35,11 @@
 #if __linux__ || _WIN32
 # include "mxml/mxml.h"
 #endif
-
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
+#if 1
+#include "uilayoutlang.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -234,6 +236,10 @@ struct Text
 
 char g_textBuffer[2048];
 char* g_textEnd;
+
+#if 1
+struct UllWidget* g_uiScreens;
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -481,6 +487,8 @@ int isTargetTile(int fid, int x, int y)
 void gprintf(float x, float y, unsigned c, const char* fmt, ...);
 void quad(float x, float y, float s, unsigned c);
 void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1);
+
+void drawUi(const char* name);
 
 char* loadFile(const char *path, int *readed);
 void loadMap(const char* path);
@@ -758,6 +766,25 @@ void gameStart(float elapse, unsigned* stage)
 
 	static const unsigned colors[] = {0x0000ff00, 0x00ffffff};
 	unsigned color = colors[gs->state];
+
+#if 1
+	// draw ui
+
+	struct UllWidget* w;
+
+	if ((w = g_uiScreens) != NULL && (w = ullFindScreen(w, "main-menu")) != NULL)
+		while (w = ullNextWidget(w), w->type != 'X')
+		{
+			char *s = NULL, t[256];
+			*t = 0;
+
+			while ((s = ullFormat(t, ullText(w), s)) != NULL)
+					if (strnicmp(s, "level", 5) == 0)
+						s = g_map_progression[g_current_map].name;
+
+			gprintf(ullX(w) / 100.f, ullY(w) / 100.f, ~0, t);
+		}
+#endif
 
 	gprintf(.5f, .5f, 0x00ff00ff, "Touchy Warehouse Keeper");
 	gprintf(.5f, .5f + g_fontSpace, 0x00ff00ff, "v0.1");
@@ -1526,10 +1553,36 @@ render_floor:
 
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
 
+
+#if 1
+	// draw ui
+
+	struct UllWidget* w;
+
+	if ((w = g_uiScreens) != NULL && (w = ullFindScreen(w, "in-game")) != NULL)
+		while (w = ullNextWidget(w), w->type != 'X')
+		{
+			char *s = NULL, t[256], t2[64];
+			*t = 0;
+
+			while ((s = ullFormat(t, ullText(w), s)) != NULL)
+					if (strnicmp(s, "level", 5) == 0)
+						s = g_map_progression[g_current_map].name;
+					else if (strnicmp(s, "time", 5) == 0)
+						sprintf(s = t2, "%02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
+					else if (strnicmp(s, "moves", 5) == 0)
+						s = itoa(gp->moves, t2, 10);
+					else if (strnicmp(s, "par", 5) == 0)
+						s = itoa(g_map_progression[g_current_map].par, t2, 10);
+
+			gprintf(ullX(w) / 100.f, ullY(w) / 100.f, ~0, t);
+		}
+#else
 	gprintf(.02f, .05f, 0x00ffffff, "LEVEL: %s", g_map_progression[g_current_map].name);
 	gprintf(.02f, .05f + g_fontSpace, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
 	gprintf(.02f, .05f + g_fontSpace * 2.f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
 	gprintf(.02f, .95f, 0x00ffffff, "[U]NDO   [P]AUSE   [R]ESTART");
+#endif
 
 	if (g_map_progression[g_current_map].txt[0] != 0) 
 	{
@@ -1843,8 +1896,9 @@ char* loadFile(const char *path, int *readed)
 	fseek(fd, 0, SEEK_END);
 	size = ftell(fd);
 	rewind(fd);
-	data = (char*) malloc(size);
+	data = (char*) malloc(size + 1);
 	*readed = fread(data, 1, size, fd);
+	data[size] = 0;
 	fclose(fd);
 
 	return data;
@@ -2280,6 +2334,13 @@ void onFile(char* path)
 
 		fclose(fd);
 	}
+#if 1
+	else if (stricmp(ext, ".ull") == 0)
+	{
+		if (data = loadFile(path, &n), ullCompile(data) >= 0)
+			g_uiScreens = (struct UllWidget*) data;
+	}
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
