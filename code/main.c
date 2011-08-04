@@ -30,7 +30,6 @@
 #include <string.h>
 #if _WIN32
 # include "bass/bass.h"
-# define uint unsigned int
 #endif
 #if __linux__ || _WIN32
 # include "mxml/mxml.h"
@@ -143,6 +142,7 @@ struct Pref g_prefs[32];
 
 ///////////////////////////////////////////////////////////////////////////////
 
+typedef float vec2[2];
 typedef float vec3[3];
 typedef float vec4[4];
 typedef float mat4[16];
@@ -222,30 +222,18 @@ int g_mousey;
 ///////////////////////////////////////////////////////////////////////////////
 
 stbtt_bakedchar g_fontData[96];
-unsigned g_fontTex;
 float g_fontSpace;
-
-struct Text
-{
-	float x, y;
-	unsigned color, length;
-	char string[0];
-};
-
-char g_textBuffer[2048];
-char* g_textEnd;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 enum
 {
+	TEX_FONT,
 	TEX_CRATE,
 	TEX_PLAYER,
 	TEX_WALLFLOOR,
 	TEX_WALLVARS,
 	TEX_FLOORVARS,
-	TEX_FLOOR_G,
-	TEX_FLOOR_P,
 	TEX_TARGET_G,
 	TEX_TARGET_P,
 	TEX_CLOUD,
@@ -280,13 +268,12 @@ enum
 
 const char* g_texnames[] =
 {
+	"<font>",
 	"crate",
 	"player",
 	"wallfloor",
 	"wall-vars",
 	"floor-vars",
-	"floor-g",
-	"floor-p",
 	"target-g",
 	"target-p",
 	"cloud"
@@ -304,7 +291,6 @@ void createMapTex(unsigned id, const char *data, int size, int width, int height
 	glGenTextures(1, &g_tex[id]);
 	glBindTexture(GL_TEXTURE_2D, g_tex[id]);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
 	g_validMapTex[(id - NUM_TEX) / 8] |= 1 << (id - NUM_TEX) % 8;
 	free(image_data);
@@ -355,8 +341,8 @@ int g_current_map = 0;
 #define MAX_FLOORS 4
 #define MAX_RAMPS 2
 #define MAX_CRATES 32
-#define MAX_LAYERS 10
-#define MAX_TEXTURES 20
+#define MAX_LAYERS 8
+#define MAX_TEXTURES 16
 
 struct Crate
 {
@@ -480,7 +466,7 @@ int isTargetTile(int fid, int x, int y)
 
 void gprintf(float x, float y, unsigned c, const char* fmt, ...);
 void quad(float x, float y, float s, unsigned c);
-void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1);
+void sprite(unsigned layer, float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1, float alpha);
 
 char* loadFile(const char *path, int *readed);
 void loadMap(const char* path);
@@ -727,17 +713,17 @@ void gameStart(float elapse, unsigned* stage)
 		attx = attx * g_width;
 		atty = g_height - atty * g_height;
 
-		glColor3f(1.f, 1.f, 1.f);
-		glBegin(GL_LINES);
-			glVertex2f(attx, atty);
-			glVertex2f(gs->spring[i].x * g_width, g_height - gs->spring[i].y * g_height);
-		glEnd();
+//		glColor3f(1.f, 1.f, 1.f);
+//		glBegin(GL_LINES);
+//			glVertex2f(attx, atty);
+//			glVertex2f(gs->spring[i].x * g_width, g_height - gs->spring[i].y * g_height);
+//		glEnd();
 
-		glPushMatrix();
-			glTranslatef(gs->spring[i].x * g_width, g_height - gs->spring[i].y * g_height, 0.f);
-			glRotatef(a, 0.f, 0.f, cz);
-			sprite(0.f, 0.f, 192.f + i * 128.f, TEX_CLOUD, 0, 0, 1, 1);
-		glPopMatrix();
+//		glPushMatrix();
+//			glTranslatef(gs->spring[i].x * g_width, g_height - gs->spring[i].y * g_height, 0.f);
+//			glRotatef(a, 0.f, 0.f, cz);
+			sprite(0, gs->spring[i].x * g_width, g_height - gs->spring[i].y * g_height, 192.f + i * 128.f, TEX_CLOUD, 0, 0, 1, 1, 1.f);
+//		glPopMatrix();
 	}
 
 	for (int i = 0; i < 3; ++i)
@@ -748,24 +734,24 @@ void gameStart(float elapse, unsigned* stage)
 		float rx = gs->crx[i];
 		float ry = gs->cry[i];
 
-		sprite((x - rx * .5f) + (rx * dx), (y - ry * .5f) + (ry * dy), s, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
+		sprite(1, (x - rx * .5f) + (rx * dx), (y - ry * .5f) + (ry * dy), s, TEX_CRATE, 0.f, 0.f, 1.f, 1.f, 1.f);
 	}
 
 	float u0, v0, u1, v1;
 	u0 = .5f, u1 = u0 + .125f;
 	v0 = .375f, v1 = v0 + .125f;
-	sprite(gs->px, gs->py, 128.f, TEX_PLAYER, u0, v0, u1, v1);
+	sprite(2, gs->px, gs->py, 128.f, TEX_PLAYER, u0, v0, u1, v1, 1.f);
 
-	static const unsigned colors[] = {0x0000ff00, 0x00ffffff};
+	static const unsigned colors[] = {0xff00ff00, 0xffffffff};
 	unsigned color = colors[gs->state];
 
-	gprintf(.5f, .5f, 0x00ff00ff, "Touchy Warehouse Keeper");
-	gprintf(.5f, .5f + g_fontSpace, 0x00ff00ff, "v0.1");
-	gprintf(.5f, .5f + g_fontSpace * 3.f, 0x00ff00ff, "Map (right click to cycle): %s", g_map_progression[g_current_map].name);
+	gprintf(.5f, .5f, 0xffff00ff, "Touchy Warehouse Keeper");
+	gprintf(.5f, .5f + g_fontSpace, 0xffff00ff, "v0.1");
+	gprintf(.5f, .5f + g_fontSpace * 3.f, 0xffff00ff, "Map (right click to cycle): %s", g_map_progression[g_current_map].name);
 	gprintf(.5f, .5f + g_fontSpace * 5.f, color, "Click to continue");
 
 	if (gs->hasSaveGame)
-		gprintf(.02f, .95f, 0x00ffffff, "[C]ONTINUE");
+		gprintf(.02f, .95f, 0xffffffff, "[C]ONTINUE");
 
 	if ((gs->blink += elapse) >= 1.f)
 		gs->blink -= 1.f, gs->state ^= 1;
@@ -1371,7 +1357,7 @@ ignore_mouse_input:
 		g_map_progression[g_current_map].seed = (int) (rand() / (float) RAND_MAX * 3333.f);
 	}
 
-	gprintf(.9f, .05f + g_fontSpace, 0x00ff00ff, "SEED %d", g_map_progression[g_current_map].seed);
+	gprintf(.9f, .05f + g_fontSpace * 2, 0xffff00ff, "SEED %d", g_map_progression[g_current_map].seed);
 
 	int myFloorId = gp->floorId;
 
@@ -1381,20 +1367,19 @@ render_floor:
 	const float vx = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 	const float vy = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 
-	glPushMatrix();
+	float alpha = 1.f;
+	float ytransl = 0.f;
 
 	if (myFloorId != gp->targetFloor)
 	{
-		glTranslatef(0.f, (float) gp->floorChange * -g_height * .25f * (1.f - gp->floorFade), 0.f);
-		glColor4f(1.f, 1.f, 1.f, gp->floorFade);
+		ytransl = (float) gp->floorChange * -g_height * .25f * (1.f - gp->floorFade);
+		alpha = gp->floorFade;
 	}
 	else if (gp->floorFade != 0.f)
 	{
-		glTranslatef(0.f, (float) gp->floorChange * g_height * .25f * gp->floorFade, 0.f);
-		glColor4f(1.f, 1.f, 1.f, 1.f - gp->floorFade);
+		ytransl = (float) gp->floorChange * g_height * .25f * gp->floorFade;
+		alpha = 1.f - gp->floorFade;
 	}
-	else
-		glColor4f(1.f, 1.f, 1.f, 1.f);
 
 	struct Floor* f = &g_world.floors[myFloorId];
 
@@ -1411,13 +1396,13 @@ render_floor:
 				{
 					float tilesize;
 					int id = getTexCoords(tile, &vu, &vv, &tilesize);
-					sprite(posX(x, ss), posY(y, ss), ss, id, vu, vv, vu + tilesize, vv + tilesize);
+					sprite(n, posX(x, ss), posY(y, ss) + ytransl, ss, id, vu, vv, vu + tilesize, vv + tilesize, alpha);
 
 					//if(n == g_world.wallLayer)
 					//{
 					//	vu = vx + floorf((.3f + .3f * sinf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
 					//	vv = vy + floorf((.5f + .2f * cosf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
-					//	sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLVARS, vu, vv, vu + .25f, vv + .25f);
+					//	sprite(posX(x, ss), posY(y, ss) + ytransl, ss, TEX_WALLVARS, vu, vv, vu + .25f, vv + .25f, alpha);
 					//}
 				}
 				else
@@ -1426,11 +1411,11 @@ render_floor:
 					vv = vy + floorf((.5f + .2f * cosf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
 
 					if (tile == TILE_FLOOR)
-						sprite(posX(x, ss), posY(y, ss), ss, TEX_FLOORVARS, vu, vv, vu + .25f, vv + .25f);
+						sprite(n, posX(x, ss), posY(y, ss) + ytransl, ss, TEX_FLOORVARS, vu, vv, vu + .25f, vv + .25f, alpha);
 					else if (tile == TILE_WALL)
-						sprite(posX(x, ss), posY(y, ss), ss, TEX_WALLVARS, vu, vv, vu + .25f, vv + .25f);
+						sprite(n, posX(x, ss), posY(y, ss) + ytransl, ss, TEX_WALLVARS, vu, vv, vu + .25f, vv + .25f, alpha);
 					else if (tile == TILE_TARGET)
-						sprite(posX(x, ss), posY(y, ss), ss, TEX_TARGET_G, 0.f, 0.f, 1.f, 1.f);
+						sprite(n, posX(x, ss), posY(y, ss) + ytransl, ss, TEX_TARGET_G, 0.f, 0.f, 1.f, 1.f, alpha);
 				}
 			}
 		}
@@ -1444,17 +1429,17 @@ render_floor:
 		if ((x0 == x1 && y0 != y1) || (x0 != x1 && y0 == y1))
 		{
 			for (int i = x0; i <= x1; ++i)
-				quad(posX(i, ss), posY(y0, ss), ss * .25f, 0);
+				quad(posX(i, ss), posY(y0, ss) + ytransl, ss * .25f, 0);
 
 			for (int i = y0; i <= y1; ++i)
-				quad(posX(x0, ss), posY(i, ss), ss * .25f, 0);
+				quad(posX(x0, ss), posY(i, ss) + ytransl, ss * .25f, 0);
 		}
 	}
 
 	if (myFloorId != gp->targetFloor)
-		glColor4f(1.f, 1.f, 1.f, gp->floorFade);
+		alpha = gp->floorFade;
 	else
-		glColor4f(1.f, 1.f, 1.f, 1.f - gp->floorFade);
+		alpha = 1.f - gp->floorFade;
 
 	const int dx = p->ix - p->x;
 	const int dy = p->iy - p->y;
@@ -1490,13 +1475,11 @@ render_floor:
 
 			float vv, vu, tilesize;
 			int id = getTexCoords(tex, &vu, &vv, &tilesize);
-			sprite(xx, yy, ss3 * sm, id, vu, vv, vu + tilesize, vv + tilesize);
+			sprite(16, xx, yy + ytransl, ss3 * sm, id, vu, vv, vu + tilesize, vv + tilesize, alpha);
 		}
 		else
-			sprite(xx, yy, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
+			sprite(16, xx, yy + ytransl, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f, alpha);
 	}
-
-	glPopMatrix();
 
 	if (gp->floorId != gp->targetFloor && myFloorId == gp->floorId)
 	{
@@ -1524,12 +1507,12 @@ render_floor:
 	if (p->move)
 		v0 += .5f, v1 += .5f;
 
-	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
+	sprite(16, posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1, 1.f);
 
-	gprintf(.02f, .05f, 0x00ffffff, "LEVEL: %s", g_map_progression[g_current_map].name);
-	gprintf(.02f, .05f + g_fontSpace, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
-	gprintf(.02f, .05f + g_fontSpace * 2.f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
-	gprintf(.02f, .95f, 0x00ffffff, "[U]NDO   [P]AUSE   [R]ESTART");
+	gprintf(.02f, .05f, 0xffffffff, "LEVEL: %s", g_map_progression[g_current_map].name);
+	gprintf(.02f, .05f + g_fontSpace, 0xffffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
+	gprintf(.02f, .05f + g_fontSpace * 2.f, 0xffffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
+	gprintf(.02f, .95f, 0xffffffff, "[U]NDO   [P]AUSE   [R]ESTART");
 
 	if (g_map_progression[g_current_map].txt[0] != 0) 
 	{
@@ -1540,7 +1523,7 @@ render_floor:
 		char* tok = strtok(txt, "^");
 		while(tok != NULL)
 		{
-			gprintf(0.5f - (strlen(tok) * 0.005f), row, 0x00ffffff, tok);
+			gprintf(0.5f - (strlen(tok) * 0.005f), row, 0xffffffff, tok);
 			row += g_fontSpace;
 			tok = strtok(NULL, "^");
 		}
@@ -1555,15 +1538,13 @@ render_floor:
 
 		float rxsize = (size*.37f) / g_width;
 		float rysize = (size*.37f) / g_height;
-		gprintf(0.5 - rxsize, 0.5 - rysize, 0x00ffffff, "* LEVEL COMPLETED *");
-		gprintf(0.5 - rxsize, 0.5 - rysize + 0.05f, 0x00ffffff, " Click to continue");
-
-		glColor3f(1.f, 1.f, 1.f);
+		gprintf(0.5 - rxsize, 0.5 - rysize, 0xffffffff, "* LEVEL COMPLETED *");
+		gprintf(0.5 - rxsize, 0.5 - rysize + 0.05f, 0xffffffff, " Click to continue");
 
 		float u0, v0, u1, v1;
 		u0 = .5f, u1 = u0 + .125f;
 		v0 = .375f, v1 = v0 + .125f;
-		sprite(x, y + 25.f, 128.f, TEX_PLAYER, u0, v0, u1, v1);
+		sprite(16, x, y + 25.f, 128.f, TEX_PLAYER, u0, v0, u1, v1, 1.f);
 	}
 }
 
@@ -1577,8 +1558,8 @@ struct GameOver
 
 void gameOver(float elapse, unsigned* stage)
 {
-	gprintf(.5f, .5f, 0x00ff00ff, "You died");
-	gprintf(.5f, .54f, 0x00ff00ff, "Exit in %d", 3 - g_gameOver.count);
+	gprintf(.5f, .5f, 0xffff00ff, "You died");
+	gprintf(.5f, .54f, 0xffff00ff, "Exit in %d", 3 - g_gameOver.count);
 
 	if ((g_gameOver.time += elapse) >= 1.f)
 	{
@@ -1624,6 +1605,122 @@ void renderGame(float elapse)
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+struct Vertex
+{
+	vec2 pos;
+	vec2 uv;
+	vec4 color;
+};
+
+unsigned g_nbatch;
+
+struct Batch
+{
+	unsigned id, num, cap;
+	struct Vertex* ptr;
+} g_batches[32];
+
+int batchCmp(const void* a, const void* b)
+{
+	return ((struct Batch*) a)->id - ((struct Batch*) b)->id;
+}
+
+struct Vertex* batchAlloc(unsigned id, unsigned cnt)
+{
+	unsigned i, n = g_nbatch;
+
+	// find batch
+
+	for (i = 0; i < n; ++i)
+		if (g_batches[i].id == id)
+			break;
+
+	if (i == n)
+	{
+		if (i == arrayCount(g_batches))
+			return NULL;
+
+		g_nbatch = ++n;
+		g_batches[i].id = id;
+	}
+
+	// allocate memory
+
+	unsigned j = g_batches[i].num;
+	unsigned k = g_batches[i].cap;
+	struct Vertex* v = g_batches[i].ptr;
+
+	if (k < j + cnt)
+	{
+		v = (struct Vertex*) realloc(v, (j + cnt) * 3 * sizeof(struct Vertex));
+
+		g_batches[i].cap = (j + cnt) * 3;
+		g_batches[i].ptr = v;
+	}
+
+	g_batches[i].num = j + cnt;
+
+	return &v[j];
+}
+
+const char g_vpSrc[] =
+"	attribute vec2 pos;					\n"
+"								\n"
+"	void main()						\n"
+"	{							\n"
+"		gl_Position.xy = pos;				\n"
+"	}							\n";
+
+const char g_fpSrc[] =
+"	precision mediump float;				\n"
+"	uniform sampler2D tex;					\n"
+"	uniform vec4 color;					\n"
+"								\n"
+"	void main()						\n"
+"	{							\n"
+"		gl_FragColor = texture2D(tex, ) * color;	\n"
+"	}							\n";
+
+unsigned g_vpId, g_fpId, g_spId;
+unsigned g_spPosAttr;
+unsigned g_spTexVary;
+
+void setupShaders()
+{
+#if __ANDROID__
+	static int init;
+	int res;
+
+	if (!init)
+	{
+		init = 1;
+
+		g_vpId = glCreateShader(GL_VERTEX_SHADER);
+		glShaderSource(g_vpId, 1, g_vp_cg, NULL);
+		glCompileShader(g_vpId);
+		glShaderiv(g_vpId, GL_COMPILE_STATUS, &res);
+		assert(res != 0);
+
+		g_fpId = glCreateShader(GL_FRAGMENT_SHADER);
+		glShaderSource(g_fpId, 1, g_fp_cg, NULL);
+		glCompileShader(g_fpId);
+		glShaderiv(g_fpId, GL_COMPILE_STATUS, &res);
+		assert(res != 0);
+
+		g_spId = glCreateProgram();
+		glAttachShader(g_spId, vp);
+		glAttachShader(g_spId, fp);
+		glLinkProgram(g_spId);
+		glProgramiv(g_spId, GL_LINK_STATUS, &res);
+		assert(res != 0);
+
+		gl_spPosAttr = glGetAttribLocation(g_spId, "pos");
+	}
+#endif
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 void gprintf(float x, float y, unsigned c, const char* fmt, ...)
 {
 	va_list ap;
@@ -1634,20 +1731,59 @@ void gprintf(float x, float y, unsigned c, const char* fmt, ...)
 	n = vsnprintf(s, sizeof(s), fmt, ap);
 	va_end(ap);
 
-	if ((size_t) (&g_textBuffer[sizeof(g_textBuffer)] - g_textEnd) >= sizeof(struct Text) + n + 1)
-	{
-		((struct Text*) g_textEnd)->x = x;
-		((struct Text*) g_textEnd)->y = y;
-		((struct Text*) g_textEnd)->color = c;
-		((struct Text*) g_textEnd)->length = n;
-		memcpy(((struct Text*) g_textEnd)->string, s, n + 1);
+	struct Vertex* v = batchAlloc(31 << 24 | TEX_FONT, n * 4);
 
-		g_textEnd += sizeof(struct Text) + n + 1;
+	x *= g_width;
+	y *= g_height;
+
+	for (unsigned i = 0; i < n; ++i)
+	{
+		stbtt_aligned_quad q;
+		stbtt_GetBakedQuad(g_fontData, 512, 512, s[i] - 32, &x, &y, &q, 1);
+
+		v[0].pos[0] = q.x0;
+		v[0].pos[1] = q.y0;
+		v[0].uv[0] = q.s0;
+		v[0].uv[1] = q.t0;
+		v[0].color[0] = ((c >> 0) & 0xff) / 255.f;
+		v[0].color[1] = ((c >> 8) & 0xff) / 255.f;
+		v[0].color[2] = ((c >> 16) & 0xff) / 255.f;
+		v[0].color[3] = ((c >> 24) & 0xff) / 255.f;
+
+		v[1].pos[0] = q.x1;
+		v[1].pos[1] = q.y0;
+		v[1].uv[0] = q.s1;
+		v[1].uv[1] = q.t0;
+		v[1].color[0] = ((c >> 0) & 0xff) / 255.f;
+		v[1].color[1] = ((c >> 8) & 0xff) / 255.f;
+		v[1].color[2] = ((c >> 16) & 0xff) / 255.f;
+		v[1].color[3] = ((c >> 24) & 0xff) / 255.f;
+
+		v[2].pos[0] = q.x1;
+		v[2].pos[1] = q.y1;
+		v[2].uv[0] = q.s1;
+		v[2].uv[1] = q.t1;
+		v[2].color[0] = ((c >> 0) & 0xff) / 255.f;
+		v[2].color[1] = ((c >> 8) & 0xff) / 255.f;
+		v[2].color[2] = ((c >> 16) & 0xff) / 255.f;
+		v[2].color[3] = ((c >> 24) & 0xff) / 255.f;
+
+		v[3].pos[0] = q.x0;
+		v[3].pos[1] = q.y1;
+		v[3].uv[0] = q.s0;
+		v[3].uv[1] = q.t1;
+		v[3].color[0] = ((c >> 0) & 0xff) / 255.f;
+		v[3].color[1] = ((c >> 8) & 0xff) / 255.f;
+		v[3].color[2] = ((c >> 16) & 0xff) / 255.f;
+		v[3].color[3] = ((c >> 24) & 0xff) / 255.f;
+
+		v = &v[4];
 	}
 }
 
 void quad(float x, float y, float s, unsigned c)
 {
+/*
 	glColor4ubv((unsigned char*) &c);
 
 	glPushMatrix();
@@ -1661,35 +1797,52 @@ void quad(float x, float y, float s, unsigned c)
 	glEnd();
 
 	glPopMatrix();
+*/
 }
 
-void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1)
+void sprite(unsigned layer, float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1, float alpha)
 {
-//	glColor3f(1.f, 1.f, 1.f);
+	const unsigned id = layer << 24 | texId;
+	struct Vertex* v = batchAlloc(id, 4);
 
-	glPushMatrix();
-	glTranslatef(x, y, 0.f);
+	if (v == NULL)
+		return;
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	v[0].pos[0] = x - s * .5f;
+	v[0].pos[1] = y + s * .5f;
+	v[0].uv[0] = u0;
+	v[0].uv[1] = v1;
+	v[0].color[0] = 1.f;
+	v[0].color[1] = 1.f;
+	v[0].color[2] = 1.f;
+	v[0].color[3] = alpha;
 
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, g_tex[texId]);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	v[1].pos[0] = x + s * .5f;
+	v[1].pos[1] = y + s * .5f;
+	v[1].uv[0] = u1;
+	v[1].uv[1] = v1;
+	v[1].color[0] = 1.f;
+	v[1].color[1] = 1.f;
+	v[1].color[2] = 1.f;
+	v[1].color[3] = alpha;
 
-	glBegin(GL_QUADS);
-		glTexCoord2f(u0, v1), glVertex2f(-(s * .5f), s * .5f);
-		glTexCoord2f(u1, v1), glVertex2f(s * .5f, s * .5f);
-		glTexCoord2f(u1, v0), glVertex2f(s * .5f, -(s * .5f));
-		glTexCoord2f(u0, v0), glVertex2f(-(s * .5f), -(s * .5f));
-	glEnd();
+	v[2].pos[0] = x + s * .5f;
+	v[2].pos[1] = y - s * .5f;
+	v[2].uv[0] = u1;
+	v[2].uv[1] = v0;
+	v[2].color[0] = 1.f;
+	v[2].color[1] = 1.f;
+	v[2].color[2] = 1.f;
+	v[2].color[3] = alpha;
 
-	glDisable(GL_TEXTURE_2D);
-	glDisable(GL_BLEND);
-	glPopMatrix();
+	v[3].pos[0] = x - s * .5f;
+	v[3].pos[1] = y - s * .5f;
+	v[3].uv[0] = u0;
+	v[3].uv[1] = v0;
+	v[3].color[0] = 1.f;
+	v[3].color[1] = 1.f;
+	v[3].color[2] = 1.f;
+	v[3].color[3] = alpha;
 }
 
 void onKeyDown(unsigned char k, int x, int y)
@@ -1713,6 +1866,8 @@ void onKeyUp(unsigned char k, int x, int y)
 
 void onReshape(int w, int h)
 {
+	setupShaders();
+
 	g_reshape = 1;
 	g_width = w;
 	g_height = h;
@@ -1751,7 +1906,7 @@ void onDisplay()
 	elapse = (1.f / 3.f) * elapse + (1.f - 1.f / 3.f) * g_elapse;
 	g_elapse = elapse;
 
-	gprintf(.9f, .05f, 0x00cf7f7f, "FPS %.02f", 1.f / elapse);
+	gprintf(.9f, .05f, 0xffcf7f7f, "FPS %.02f", 1.f / elapse);
 
 	// render game
 
@@ -1776,42 +1931,66 @@ void onDisplay()
 	glColor4f(1.f, 1.f, 1.f, 1.f);
 	renderGame(elapse);
 
-	// render font
+	// render batches
+
+	gprintf(.9f, .05f + g_fontSpace, 0xffcf7f7f, "BATCHES %u", g_nbatch);
+
+	qsort(&g_batches, g_nbatch, sizeof(struct Batch), batchcmp);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, g_fontTex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-	glBegin(GL_QUADS);
+#if __ANDROID__
+	glUseProgram(g_spId);
+#endif
 
-	for (
-		struct Text* t = (struct Text*) g_textBuffer;
-		t != (struct Text*) g_textEnd;
-		t = (struct Text*) &t->string[t->length + 1])
+	for (unsigned i = 0, n = g_nbatch; i < n; ++i)
 	{
-		float x = g_width * t->x;
-		float y = g_height * t->y;
+		struct Batch* b = &g_batches[i];
 
-		for (unsigned i = 0, n = t->length; i < n; ++i)
+#if __ANDROID__
+		glActivateTexture(GL_TEXTURE0 + 0);
+		glUniform1i(g_spTexVary, 0);
+#endif
+
+		glBindTexture(GL_TEXTURE_2D, g_tex[b->id & 0xffff]);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+#if __ANDROID__
+		glVertexAttribPointer(g_spPosAttr, 2, GL_FLOAT, GL_FALSE, sizeof(struct Vertex), g_vertices);
+		glEnableVertexAttribArray(g_spPosAttr);
+		glDrawArrays(GL_QUADS, 0, g_vertexCount);
+#else
+		glBegin(GL_QUADS);
+
+		for (unsigned j = 0, m = b->num; j < m; ++j)
 		{
-			stbtt_aligned_quad q;
-			stbtt_GetBakedQuad(g_fontData, 512, 512, t->string[i] - 32, &x, &y, &q, 1);
+			const struct Vertex* v = &b->ptr[j];
 
-			glTexCoord2f(q.s0, q.t0); glVertex2f(q.x0, q.y0);
-			glTexCoord2f(q.s1, q.t0); glVertex2f(q.x1, q.y0);
-			glTexCoord2f(q.s1, q.t1); glVertex2f(q.x1, q.y1);
-			glTexCoord2f(q.s0, q.t1); glVertex2f(q.x0, q.y1);
+			glColor4fv(v->color);
+			glTexCoord2f(v->uv[0], v->uv[1]);
+			glVertex2f(v->pos[0], v->pos[1]);
 		}
+
+		glEnd();
+#endif
 	}
 
-	glEnd();
 	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_BLEND);
 
-	g_textEnd = g_textBuffer;
+	for (unsigned i = 0, n = g_nbatch; i < n; ++i)
+	{
+		g_batches[i].id = 0;
+		g_batches[i].num = 0;
+	}
+
+	g_nbatch = 0;
 
 	// end frame
 
@@ -1820,6 +1999,8 @@ void onDisplay()
 	g_reshape = 0;
 
 	snooze(15);
+	glFinish();
+
 	glutSwapBuffers();
 	glutPostWindowRedisplay(g_window);
 }
@@ -1827,26 +2008,32 @@ void onDisplay()
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-char* loadFile(const char *path, int *readed)
+char* loadFile(const char* path, int* len)
 {
 	FILE* fd;
-	long size;
 	char* data;
+	size_t size, nread;
 
 	printf("Loading [%s]\n", path);
 	fd = fopen(path, "rb");
+
 	if(fd == NULL)
 	{
-		printf(">>> ERROR OPENING FILE [%s] <<< ... blame Heiko", path);
+		printf(">>> ERROR OPENING FILE [%s]", path);
 		exit(1);
 	}
+
 	fseek(fd, 0, SEEK_END);
 	size = ftell(fd);
 	rewind(fd);
+
 	data = (char*) malloc(size);
-	*readed = fread(data, 1, size, fd);
+	nread = fread(data, size, 1, fd);
 	fclose(fd);
 
+	(void) nread;
+
+	*len = (int) size;
 	return data;
 }
 
@@ -2226,8 +2413,8 @@ void loadFont(const char* name, unsigned size)
 
 	stbtt_BakeFontBitmap(data, 0, (float) size, tmp, 512, 512, 32, 96, g_fontData);
 
-	glGenTextures(1, &g_fontTex);
-	glBindTexture(GL_TEXTURE_2D, g_fontTex);
+	glGenTextures(1, &g_tex[TEX_FONT]);
+	glBindTexture(GL_TEXTURE_2D, g_tex[TEX_FONT]);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 512, 512, 0, GL_ALPHA, GL_UNSIGNED_BYTE, tmp);
 
 	free(data);
@@ -2260,6 +2447,8 @@ void onFile(char* path)
 
 		data = loadFile(path, &n);
 		assert(n == w * h * 4);
+
+		printf("-> texid=%u\n", i);
 
 		glGenTextures(1, &g_tex[i]);
 		glBindTexture(GL_TEXTURE_2D, g_tex[i]);
@@ -2347,8 +2536,6 @@ void init(int* argc, char* argv[])
 
 	if (fontName != NULL)
 		loadFont(fontName, fontSize);
-
-	g_textEnd = g_textBuffer;
 }
 
 void end()
