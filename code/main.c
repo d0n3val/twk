@@ -254,34 +254,10 @@ enum
 
 #define NUM_MAP_TEX (16)
 
-#define texUvPlayer_up(u0,v0,u1,v1,s) \
-	do { \
-		u0 = 0.f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
-		v0 = 0.f; v1 = .125f; \
-	} while (0)
-
-#define texUvPlayer_right(u0,v0,u1,v1,s) \
-	do { \
-		u0 = .5f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
-		v0 = 0.f; v1 = .125f; \
-	} while (0)
-
-#define texUvPlayer_down(u0,v0,u1,v1,s) \
-	do { \
-		u0 = 0.f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
-		v0 = .125f; v1 = .25f; \
-	} while (0)
-
-#define texUvPlayer_left(u0,v0,u1,v1,s) \
-	do { \
-		u0 = .5f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
-		v0 = .125f; v1 = .25f; \
-	} while (0)
-
 const char* g_texnames[] =
 {
 	"crate",
-	"player",
+	"<player>",
 	"wallfloor",
 	"wall-vars",
 	"floor-vars",
@@ -318,6 +294,40 @@ void destroyMapTex()
 
 	memset(g_validMapTex, 0, sizeof(g_validMapTex));
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+#define PLAYER_ANIM_TILE_WALKRIGHT (0)
+#define PLAYER_ANIM_TILE_WALKLEFT (2)
+#define PLAYER_ANIM_TILE_WALKDOWN (4)
+#define PLAYER_ANIM_TILE_WALKUP (6)
+#define PLAYER_ANIM_TILE_PUSHRIGHT (1)
+#define PLAYER_ANIM_TILE_PUSHLEFT (3)
+#define PLAYER_ANIM_TILE_PUSHDOWN (5)
+#define PLAYER_ANIM_TILE_PUSHUP (7)
+
+const char* g_playerAnimTileNames[] = {
+	"walkright", "pushright", "walkleft", "pushleft",
+	"walkdown", "pushdown", "walkup", "pushup"
+};
+
+struct PlayerAnimInfo {
+	char width, height;
+	char tileWidth, tileHeight;
+	char source[0];
+};
+
+#define PLAYER_ANIM_FRAME_COUNT (6)
+
+struct PlayerAnimTile {
+	struct {
+		float s0, t0;
+		float s1, t1;
+	} frames[PLAYER_ANIM_FRAME_COUNT];
+};
+
+struct PlayerAnimInfo* g_playerAnimInfo;
+struct PlayerAnimTile* g_playerAnimTiles;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -752,8 +762,14 @@ void gameStart(float elapse, unsigned* stage)
 	}
 
 	float u0, v0, u1, v1;
-	u0 = .5f, u1 = u0 + .125f;
-	v0 = .375f, v1 = v0 + .125f;
+	const int f = (int) (.60f / .15f);
+	const int t = PLAYER_ANIM_TILE_WALKDOWN;
+
+	u0 = g_playerAnimTiles[t].frames[f].s0;
+	v0 = g_playerAnimTiles[t].frames[f].t0;
+	u1 = g_playerAnimTiles[t].frames[f].s1;
+	v1 = g_playerAnimTiles[t].frames[f].t1;
+
 	sprite(gs->px, gs->py, 128.f, TEX_PLAYER, u0, v0, u1, v1);
 
 	static const unsigned colors[] = {0x0000ff00, 0x00ffffff};
@@ -1504,25 +1520,33 @@ render_floor:
 		goto render_floor;
 	}
 
-	const float s = dx || dy ? clamp(p->time / p->speed, 0.f, 1.f) : .25f;
-	float u0 = 0.f, v0 = 0.f, u1 = 1.f, v1 = 1.f;
+	float u0, v0, u1, v1;
 
-	if (dx < 0.f)
-		texUvPlayer_left(u0, v0, u1, v1, s);
-	else if (dx > 0.f)
-		texUvPlayer_right(u0, v0, u1, v1, s);
-	else if (dy < 0.f)
-		texUvPlayer_up(u0, v0, u1, v1, s);
-	else if (dy > 0.f)
-		texUvPlayer_down(u0, v0, u1, v1, s);
+	if (dx || dy)
+	{
+		const float s = dx || dy ? clamp(p->time / p->speed, 0.f, 1.f) : 0.f;
+		const int f = clamp((int) (s / .15f), 0, PLAYER_ANIM_FRAME_COUNT - 1);
+		const int t =
+			dx < 0.f ? PLAYER_ANIM_TILE_WALKLEFT + p->move :
+			dx > 0.f ? PLAYER_ANIM_TILE_WALKRIGHT + p->move :
+			dy < 0.f ? PLAYER_ANIM_TILE_WALKUP + p->move :
+			dy > 0.f ? PLAYER_ANIM_TILE_WALKDOWN + p->move : -1;
+
+		u0 = g_playerAnimTiles[t].frames[f].s0;
+		v0 = g_playerAnimTiles[t].frames[f].t0;
+		u1 = g_playerAnimTiles[t].frames[f].s1;
+		v1 = g_playerAnimTiles[t].frames[f].t1;
+	}
 	else
 	{
-		u0 = .5f, u1 = u0 + .125f;
-		v0 = .25f, v1 = v0 + .125f;
-	}
+		const int f = (int) (.60f / .15f);
+		const int t = PLAYER_ANIM_TILE_WALKDOWN;
 
-	if (p->move)
-		v0 += .5f, v1 += .5f;
+		u0 = g_playerAnimTiles[t].frames[f].s0;
+		v0 = g_playerAnimTiles[t].frames[f].t0;
+		u1 = g_playerAnimTiles[t].frames[f].s1;
+		v1 = g_playerAnimTiles[t].frames[f].t1;
+	}
 
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
 
@@ -2279,6 +2303,88 @@ void onFile(char* path)
 				break;
 
 		fclose(fd);
+	}
+	else if (!stricmp(ext, ".tmx")) {
+		char name[64];
+		char fullpath[256];
+
+		if (sscanf(path, "%*[^/]/%64[^.]", name) != 1)
+			return;
+
+		if (!strcmp(name, "touchyanims")) {
+			data = loadFile(path, &n);
+
+			// parse tmx data
+
+			char* p = data;
+			char* x = p;
+			int sw = 0, sh = 0;
+
+			while ((p = strpbrk(p, "<")) != NULL) {
+				n = strcspn(++p, " ") + 1;
+
+				if (!strncmp(p, "map ", n))
+					p = strstr(p, "width=") + 7, *x++ = (char) atoi(p),
+					p = strstr(p, "height=") + 8, *x++ = (char) atoi(p),
+					p = strstr(p, "tilewidth=") + 11, *x++ = (char) atoi(p),
+					p = strstr(p, "tileheight=") + 12, *x++ = (char) atoi(p);
+				else if (!strncmp(p, "image ", n))
+					p = strstr(p, "source=") + 8, n = strcspn(p, "\""),
+					strncpy(x, p, n), x[n++] = 0, x += n,
+					p = strstr(p, "width=") + 7, sw = atoi(p),
+					p = strstr(p, "height=") + 8, sh = atoi(p);
+				else if (!strncmp(p, "tile ", n))
+					p = strstr(p, "id=") + 4, *x++ = (char) atoi(p);
+				else if (!strncmp(p, "property ", n))
+					p = strstr(p, "name=") + 6, n = strcspn(p, "\""),
+					strncpy(x, p, n), x[n++] = 0, x += n,
+					p = strstr(p, "value=") + 7, *x++ = (char) atoi(p);
+			}
+
+			*x++ = 0;
+
+			// compile texcoords for animation frames
+
+			struct PlayerAnimInfo* pai = (struct PlayerAnimInfo*) data;
+			struct PlayerAnimTile* pat = (struct PlayerAnimTile*) x;
+			char* s = pai->source + strlen(pai->source) + 1;
+			int m = pai->width * pai->height * sizeof(struct PlayerAnimTile);
+			int nx = sw / pai->tileWidth;
+			int ny = sh / pai->tileHeight;
+
+			while (*s) {
+				// let j = tile type, k = tile index, f = frame index
+
+				int j, k = *s++;
+				for (j = 0; j < arrayCount(g_playerAnimTileNames) &&
+					strcmp(s, g_playerAnimTileNames[j]); ++j);
+				s += strlen(s) + 1;
+				int f = *s++ - 1;
+
+				if (j < arrayCount(g_playerAnimTileNames))
+					pat[j].frames[f].s0 = (k % nx) * (1.f / nx),
+					pat[j].frames[f].t0 = (k / ny) * (1.f / ny),
+					pat[j].frames[f].s1 = (k % nx) * (1.f / nx) + (1.f / nx),
+					pat[j].frames[f].t1 = (k / ny) * (1.f / ny) + (1.f / ny);
+			}
+
+			g_playerAnimInfo = pai;
+			g_playerAnimTiles = pat;
+
+			// load anim texture
+
+			snprintf(fullpath, sizeof fullpath, "data/%s", pai->source);
+			data = loadFile(fullpath, &n);
+
+			unsigned char* image_data = stbi_load_from_memory(
+				(const unsigned char*) data, n, &sw, &sh, &m, 0);
+
+			glGenTextures(1, &g_tex[TEX_PLAYER]);
+			glBindTexture(GL_TEXTURE_2D, g_tex[TEX_PLAYER]);
+			glTexImage2D(GL_TEXTURE_2D, 0, 4, sw, sh, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+			free(image_data);
+			free(data);
+		}
 	}
 }
 
