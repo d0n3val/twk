@@ -2311,7 +2311,7 @@ void onFile(char* path)
 		if (sscanf(path, "%*[^/]/%64[^.]", name) != 1)
 			return;
 
-		if (!strcmp(name, "touchyanims")) {
+		if (!strcmp(name, "playeranims")) {
 			data = loadFile(path, &n);
 
 			// parse tmx data
