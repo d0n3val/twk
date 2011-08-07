@@ -1,0 +1,13 @@
+
+scene main-menu
+	label 50x50+0+0 center {Touchy Warehouse Keeper}
+	label 50x55+0+0 center {v0.2}
+	label 50x65+0+0 center {Map: $level}
+end
+
+scene in-game
+	label 2x5+0+0 center {Level: $level}
+	label 2x10+0+0 center {Time: $time}
+	label 2x15+0+0 center {Moves: $moves Par: $par}
+	label 2x95+0+0 center {[U]ndo   [P]ause   [R]estart}
+end
