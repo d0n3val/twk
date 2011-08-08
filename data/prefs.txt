@@ -1,0 +1,3 @@
+font-name = gunplay.ttf
+font-size = 24
+font-space = 0.04
