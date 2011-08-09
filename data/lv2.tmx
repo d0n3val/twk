@@ -108,21 +108,13 @@
    <tile gid="0"/>
   </data>
  </layer>
- <layer name="Shadows2" width="8" height="11">
+ <layer name="Shadows" width="8" height="11">
   <data>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="108"/>
-   <tile gid="73"/>
-   <tile gid="73"/>
-   <tile gid="91"/>
+   <tile gid="68"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
@@ -130,55 +122,70 @@
    <tile gid="84"/>
    <tile gid="0"/>
    <tile gid="0"/>
+   <tile gid="84"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="108"/>
-   <tile gid="100"/>
+   <tile gid="76"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="89"/>
-   <tile gid="73"/>
-   <tile gid="73"/>
-   <tile gid="91"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="68"/>
+   <tile gid="84"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="84"/>
    <tile gid="84"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="109"/>
    <tile gid="69"/>
-   <tile gid="67"/>
-   <tile gid="0"/>
+   <tile gid="66"/>
+   <tile gid="84"/>
    <tile gid="84"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="112"/>
-   <tile gid="73"/>
-   <tile gid="99"/>
+   <tile gid="84"/>
    <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="84"/>
    <tile gid="84"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="88"/>
+   <tile gid="84"/>
    <tile gid="0"/>
    <tile gid="0"/>
+   <tile gid="84"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="67"/>
+   <tile gid="66"/>
    <tile gid="69"/>
-   <tile gid="88"/>
+   <tile gid="76"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="84"/>
+   <tile gid="84"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="108"/>
-   <tile gid="73"/>
-   <tile gid="99"/>
-   <tile gid="97"/>
-   <tile gid="100"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="84"/>
+   <tile gid="84"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
@@ -190,14 +197,7 @@
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
+   <tile gid="76"/>
   </data>
  </layer>
  <layer name="Walls" width="8" height="11">
@@ -292,6 +292,98 @@
    <tile gid="20"/>
   </data>
  </layer>
+ <layer name="Shadows2" width="8" height="11">
+  <data>
+   <tile gid="0"/>
+   <tile gid="74"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="74"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="74"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+  </data>
+ </layer>
  <layer name="decoration" width="8" height="11">
   <data>
    <tile gid="0"/>
@@ -384,7 +476,7 @@
    <tile gid="0"/>
   </data>
  </layer>
- <objectgroup name="Objects1" width="8" height="11">
+ <objectgroup name="Objects1" width="8" height="11" visible="0">
   <object name="start" type="start" x="192" y="288" width="32" height="32">
    <properties>
     <property name="start" value="1"/>
