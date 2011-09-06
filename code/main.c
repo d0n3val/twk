@@ -803,11 +803,6 @@ void gameStart(float elapse, unsigned* stage)
 		}
 #endif
 
-	gprintf(.5f, .5f, 0x00ff00ff, "Touchy Warehouse Keeper");
-	gprintf(.5f, .5f + g_fontSpace, 0x00ff00ff, "v0.1");
-	gprintf(.5f, .5f + g_fontSpace * 3.f, 0x00ff00ff, "Map (right click to cycle): %s", g_map_progression[g_current_map].name);
-	gprintf(.5f, .5f + g_fontSpace * 5.f, color, "Click to continue");
-
 	if (gs->hasSaveGame)
 		gprintf(.02f, .95f, 0x00ffffff, "[C]ONTINUE");
 
