@@ -1,3 +1,9 @@
+<<<<<<< HEAD
 font-name = gunplay.ttf
 font-size = 24
 font-space = 0.04
+=======
+font-name = hollow.ttf
+font-size = 24
+font-space = 0.05
+>>>>>>> phoenix

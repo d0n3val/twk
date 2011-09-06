@@ -1,1 +1,1 @@
-gcc -std=gnu99 -Wall -Wextra -Werror -O2 -o twk.exe -lGL -lGLU -lglut code/*.c
+gcc -std=gnu99 -Wall -Wextra -Wno-unused-function -Wno-sign-compare -Wno-unused-parameter -Wno-unused-variable -Wno-missing-field-initializers -Werror -O2 -I. -o twk.exe -lGL -lGLU -lglut code/*.c -Imxml -Lmxml -lmxml

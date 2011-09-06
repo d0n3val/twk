@@ -9,6 +9,7 @@
 # include <dirent.h>
 # include <sys/time.h>
 # include <time.h>
+# include <strings.h>
 #endif
 #ifdef _MACOSX
 # include <OpenGL/gl.h>
@@ -29,7 +30,26 @@
 #include <string.h>
 #if _WIN32
 # include "bass/bass.h"
+# define uint unsigned int
+#endif
+#if __linux__ || _WIN32
 # include "mxml/mxml.h"
+#endif
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+#if 1
+#include "uilayoutlang.h"
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern unsigned char *stbi_load_from_memory(
+	unsigned char const *buffer, int len, int *x, int *y, int *comp, int req_comp);
+
+#ifdef __cplusplus
+}
 #endif
 
 #if _WIN32
@@ -50,7 +70,6 @@
 # define snooze(msec) Sleep(msec)
 # define tbfreq(out) do { LARGE_INTEGER _; QueryPerformanceFrequency(&_); out = _.QuadPart; } while (0)
 # define tbcount(out) do { LARGE_INTEGER _; QueryPerformanceCounter(&_); out = _.QuadPart; } while (0)
-//#elif __linux__
 #else
 # define _foreach_file(path,func) \
 	do { \
@@ -97,6 +116,10 @@
 #define max(a,b) ((a) < (b) ? (b) : (a))
 #define clamp(a,mn,mx) min(max(a, mn), mx)
 
+#define sgn(a) ((a) > 0 ? 1 : (a) < 0 ? -1 : 0)
+
+#define sqr(a) ((a) * (a))
+
 #define keyDown(k) ((g_keys[0][(k) >> 5] & (1 << ((k) & 0x1f))) && !(g_keys[1][(k) >> 5] & (1 << ((k) & 0x1f))))
 #define keyUp(k) (!(g_keys[0][(k) >> 5] & (1 << ((k) & 0x1f))) && (g_keys[1][(k) >> 5] & (1 << ((k) & 0x1f))))
 #define keyHeld(k) (g_keys[0][(k) >> 5] & (1 << ((k) & 0x1f)))
@@ -104,6 +127,85 @@
 #define buttonDown(b) ((g_buttons[0] & (1 << (b))) && !(g_buttons[1] & (1 << (b))))
 #define buttonUp(b) (!(g_buttons[0] & (1 << (b))) && (g_buttons[1] & (1 << (b))))
 #define buttonHeld(b) (g_buttons[0] & (1 << (b)))
+
+#if __linux__ || _MACOSX
+# define stricmp(s,t) strcasecmp((s), (t))
+#endif
+
+///////////////////////////////////////////////////////////////////////////////
+
+struct Pref
+{
+	char name[16];
+	char value[64];
+};
+
+unsigned g_nprefs;
+struct Pref g_prefs[32];
+
+///////////////////////////////////////////////////////////////////////////////
+
+typedef float vec3[3];
+typedef float vec4[4];
+typedef float mat4[16];
+
+void mat4Identity(float* d)
+{
+	d[0] = 1.f; d[1] = 0.f; d[2] = 0.f; d[3] = 0.f;
+	d[4] = 0.f; d[5] = 1.f; d[6] = 0.f; d[7] = 0.f;
+	d[8] = 0.f; d[9] = 0.f; d[10] = 1.f; d[11] = 0.f;
+	d[12] = 0.f; d[13] = 0.f; d[14] = 0.f; d[15] = 1.f;
+}
+
+void mat4Mul(float* __restrict d, float* __restrict s, float* __restrict t)
+{
+	d[0] = s[0] * t[0] + s[1] * t[4] + s[2] * t[8] + s[3] * t[12];
+	d[1] = s[0] * t[1] + s[1] * t[5] + s[2] * t[9] + s[3] * t[13];
+	d[2] = s[0] * t[2] + s[1] * t[6] + s[2] * t[10] + s[3] * t[14];
+	d[3] = s[0] * t[3] + s[1] * t[7] + s[2] * t[11] + s[3] * t[15];
+	d[4] = s[4] * t[0] + s[5] * t[4] + s[6] * t[8] + s[7] * t[12];
+	d[5] = s[4] * t[1] + s[5] * t[5] + s[6] * t[9] + s[7] * t[13];
+	d[6] = s[4] * t[2] + s[5] * t[6] + s[6] * t[10] + s[7] * t[14];
+	d[7] = s[4] * t[3] + s[5] * t[7] + s[6] * t[11] + s[7] * t[15];
+	d[8] = s[8] * t[0] + s[9] * t[4] + s[10] * t[8] + s[11] * t[12];
+	d[9] = s[8] * t[1] + s[9] * t[5] + s[10] * t[9] + s[11] * t[13];
+	d[10] = s[8] * t[2] + s[9] * t[6] + s[10] * t[10] + s[11] * t[14];
+	d[11] = s[8] * t[3] + s[9] * t[7] + s[10] * t[11] + s[11] * t[15];
+	d[12] = s[12] * t[0] + s[13] * t[4] + s[14] * t[8] + s[15] * t[12];
+	d[13] = s[12] * t[1] + s[13] * t[5] + s[14] * t[9] + s[15] * t[13];
+	d[14] = s[12] * t[2] + s[13] * t[6] + s[14] * t[10] + s[15] * t[14];
+	d[15] = s[12] * t[3] + s[13] * t[7] + s[14] * t[11] + s[15] * t[15];
+}
+
+static void mat4Ortho(float* m, float left, float right, float bottom, float top, float znear, float zfar)
+{
+	float width = right - left;
+	float height = top - bottom;
+	float depth = zfar - znear;
+
+	float x = (right + left) / width;
+	float y = (top + bottom) / height;
+	float z = (zfar + znear) / depth;
+
+	m[0] = 2.f / width;
+	m[1] = 0.f;
+	m[2] = 0.f;
+	m[3] = 0.f;
+	m[4] = 0.f;
+	m[5] = 2.f / height;
+	m[6] = 0.f;
+	m[7] = 0.f;
+	m[8] = 0.f;
+	m[9] = 0.f;
+	m[10] = 2.f / depth;
+	m[11] = 0.f;
+	m[12] = -x;
+	m[13] = -y;
+	m[14] = -z;
+	m[15] = 1.f;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 unsigned long long g_clock;
 double g_period;
@@ -119,34 +221,11 @@ unsigned g_buttons[2];
 int g_mousex;
 int g_mousey;
 
-int g_fontList;
-const unsigned g_font[] =
-{
-	0x00000000, 0x00000000, 0x00000800, 0x08080808, 0x00000000, 0x14141400, 0x3e141400, 0x14143e14,
-	0x0a3c0800, 0x081e281c, 0x10260600, 0x30320408, 0x2a241a00, 0x10282810, 0x00000000, 0x02040800,
-	0x08040200, 0x02040808, 0x08102000, 0x20100808, 0x1c2a0800, 0x082a1c08, 0x08080000, 0x0008083e,
-	0x00080810, 0x00000000, 0x00000000, 0x0000003e, 0x00181800, 0x00000000, 0x10200000, 0x00020408,
-	0x32221c00, 0x1c22262a, 0x08083e00, 0x08182808, 0x18203e00, 0x1c220204, 0x02221c00, 0x1c22020c,
-	0x3e040400, 0x040c1424, 0x02221c00, 0x3e203c02, 0x22221c00, 0x0c10203c, 0x08080800, 0x3e220408,
-	0x22221c00, 0x1c22221c, 0x02041800, 0x1c22221e, 0x00080000, 0x00000800, 0x00080810, 0x00000800,
-	0x180c0600, 0x060c1830, 0x3e000000, 0x00003e00, 0x0c183000, 0x30180c06, 0x08000800, 0x1c220204,
-	0x2e201c00, 0x1c222e2a, 0x3e222200, 0x08142222, 0x12123c00, 0x3c12123c, 0x20120c00, 0x0c122020,
-	0x12143800, 0x38141212, 0x20203e00, 0x3e20203c, 0x20202000, 0x3e20203c, 0x22221c00, 0x1c22202e,
-	0x22222200, 0x2222223e, 0x08081c00, 0x1c080808, 0x04241800, 0x0e040404, 0x28242200, 0x22242830,
-	0x20203e00, 0x20202020, 0x22222200, 0x22362a2a, 0x26262200, 0x2232322a, 0x22221c00, 0x1c222222,
-	0x20202000, 0x3c22223c, 0x2a241a00, 0x1c222222, 0x28242200, 0x3c22223c, 0x02221c00, 0x1c22201c,
-	0x08080800, 0x3e080808, 0x22221c00, 0x22222222, 0x14140800, 0x22222222, 0x2a362200, 0x2222222a,
-	0x14222200, 0x22221408, 0x08080800, 0x2222221c, 0x10203e00, 0x3e020408, 0x08080e00, 0x0e080808,
-	0x04020000, 0x00201008, 0x08083800, 0x38080808, 0x00000000, 0x08142200, 0x00003e00, 0x00000000,
-	0x00000000, 0x00000000, 0x1e221e00, 0x00001c02, 0x22322c00, 0x20202c32, 0x20221c00, 0x00001c22,
-	0x22261a00, 0x02021a26, 0x3e201c00, 0x00001c22, 0x08080800, 0x040a083e, 0x261a021c, 0x00001a26,
-	0x22222200, 0x20202c32, 0x08081c00, 0x08001808, 0x08084830, 0x08001808, 0x30282400, 0x20202428,
-	0x08081c00, 0x18080808, 0x2a2a2a00, 0x0000342a, 0x22222200, 0x00002c32, 0x22221c00, 0x00001c22,
-	0x322c2020, 0x00002c32, 0x261a0202, 0x00001a26, 0x20202000, 0x00002c32, 0x3c023c00, 0x00001e20,
-	0x10120c00, 0x10103c10, 0x24241a00, 0x00002424, 0x22140800, 0x00002222, 0x2a2a1400, 0x0000222a,
-	0x08142200, 0x00002214, 0x261a021c, 0x00002222, 0x08103e00, 0x00003e04, 0x10100c00, 0x0c101020,
-	0x08080800, 0x08080808, 0x08083000, 0x30080804, 0x00000000, 0x3e000000, 0x00000000, 0x00000000
-};
+///////////////////////////////////////////////////////////////////////////////
+
+stbtt_bakedchar g_fontData[96];
+unsigned g_fontTex;
+float g_fontSpace;
 
 struct Text
 {
@@ -157,6 +236,10 @@ struct Text
 
 char g_textBuffer[2048];
 char* g_textEnd;
+
+#if 1
+struct UllWidget* g_uiScreens;
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -175,35 +258,12 @@ enum
 	NUM_TEX
 };
 
-#define MAX_TEX 100
+#define NUM_MAP_TEX (16)
 
-#define texUvPlayer_up(u0,v0,u1,v1,s) \
-	do { \
-		u0 = 0.f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
-		v0 = 0.f; v1 = .125f; \
-	} while (0)
-
-#define texUvPlayer_right(u0,v0,u1,v1,s) \
-	do { \
-		u0 = .5f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
-		v0 = 0.f; v1 = .125f; \
-	} while (0)
-
-#define texUvPlayer_down(u0,v0,u1,v1,s) \
-	do { \
-		u0 = 0.f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
-		v0 = .125f; v1 = .25f; \
-	} while (0)
-
-#define texUvPlayer_left(u0,v0,u1,v1,s) \
-	do { \
-		u0 = .5f + floorf((s) / .25f) * .125f; u1 = (u0) + .125f; \
-		v0 = .125f; v1 = .25f; \
-	} while (0)
-
-const char* g_texnames[] = {
+const char* g_texnames[] =
+{
 	"crate",
-	"player",
+	"<player>",
 	"wallfloor",
 	"wall-vars",
 	"floor-vars",
@@ -214,7 +274,66 @@ const char* g_texnames[] = {
 	"cloud"
 };
 
-unsigned g_tex[NUM_TEX+MAX_TEX];
+unsigned g_tex[NUM_TEX + NUM_MAP_TEX];
+unsigned char g_validMapTex[(NUM_MAP_TEX / 8) + 1];
+
+void createMapTex(unsigned id, const char *data, int size, int width, int height) 
+{
+	int comp;
+	unsigned char* image_data = stbi_load_from_memory(
+		(const unsigned char*) data, size, &width, &height, &comp, 0);
+
+	glGenTextures(1, &g_tex[id]);
+	glBindTexture(GL_TEXTURE_2D, g_tex[id]);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+	g_validMapTex[(id - NUM_TEX) / 8] |= 1 << (id - NUM_TEX) % 8;
+	free(image_data);
+}
+
+void destroyMapTex()
+{
+	for (unsigned i = 0; i < NUM_MAP_TEX; ++i)
+		if (g_validMapTex[i / 8] & (1 << i % 8))
+			glDeleteTextures(1, &g_tex[NUM_TEX + i]);
+
+	memset(g_validMapTex, 0, sizeof(g_validMapTex));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#define PLAYER_ANIM_TILE_WALKRIGHT (0)
+#define PLAYER_ANIM_TILE_WALKLEFT (2)
+#define PLAYER_ANIM_TILE_WALKDOWN (4)
+#define PLAYER_ANIM_TILE_WALKUP (6)
+#define PLAYER_ANIM_TILE_PUSHRIGHT (1)
+#define PLAYER_ANIM_TILE_PUSHLEFT (3)
+#define PLAYER_ANIM_TILE_PUSHDOWN (5)
+#define PLAYER_ANIM_TILE_PUSHUP (7)
+
+const char* g_playerAnimTileNames[] = {
+	"walkright", "pushright", "walkleft", "pushleft",
+	"walkdown", "pushdown", "walkup", "pushup"
+};
+
+struct PlayerAnimInfo {
+	char width, height;
+	char tileWidth, tileHeight;
+	char source[0];
+};
+
+#define PLAYER_ANIM_FRAME_COUNT (6)
+
+struct PlayerAnimTile {
+	struct {
+		float s0, t0;
+		float s1, t1;
+	} frames[PLAYER_ANIM_FRAME_COUNT];
+};
+
+struct PlayerAnimInfo* g_playerAnimInfo;
+struct PlayerAnimTile* g_playerAnimTiles;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -249,98 +368,124 @@ int g_current_map = 0;
 #define TILE_TARGET ('*')
 #define TILE_UNKNOWN ('?')
 
+#define MAX_FLOORS 4
+#define MAX_RAMPS 2
 #define MAX_CRATES 32
 #define MAX_LAYERS 10
 #define MAX_TEXTURES 20
 
-struct Object
+struct Crate
 {
 	int x, y;
 };
 
-struct texData 
+struct Target
+{
+	int x, y;
+};
+
+struct Ramp
+{
+	int x, y;
+	int dir;
+};
+
+struct TexData
 {
 	int max_id;
 	int num_tiles;
 };
 
-
-struct World
+struct Floor
 {
-	int ntextures;
-	struct texData Textures[MAX_TEXTURES];
-
-	int crateTex;
-	int crateTargetTex;
 	int ncrates;
-	struct Object crates[MAX_CRATES];
+	struct Crate crates[MAX_CRATES];
 
 	int ntargets;
-	struct Object targets[MAX_CRATES];
+	struct Target targets[MAX_CRATES];
 
-	int startx, starty;
-	int nx, ny;
+	int nramps;
+	struct Ramp ramps[MAX_RAMPS];
+
 	int nlayers;
 	int wallLayer;
 	unsigned char tiles[MAX_LAYERS][4096];
 };
 
+struct World
+{
+	int ntextures;
+	struct TexData Textures[MAX_TEXTURES];
+	int crateTex;
+	int crateTargetTex;
+
+	int nx, ny;
+	int startx, starty;
+	int startFloor;
+
+	struct Floor floors[MAX_FLOORS];
+};
+
 struct World g_world;
 
-int worldTile(int layer, int x, int y)
+int worldTile(int fid, int layer, int x, int y)
 {
-	return x >= 0 && y >= 0 ? g_world.tiles[layer][y * g_world.nx + x] : TILE_UNKNOWN;
+	struct Floor* f = &g_world.floors[fid];
+
+	return x >= 0 && y >= 0 ? f->tiles[layer][y * g_world.nx + x] : TILE_UNKNOWN;
 }
 
-struct Object* worldCrates(int x, int y)
+struct Crate* worldCrates(int fid, int x, int y)
 {
-	for (int i = 0; i < g_world.ncrates; ++i)
-		if (g_world.crates[i].x == x && g_world.crates[i].y == y)
-			return &g_world.crates[i];
+	struct Floor* f = &g_world.floors[fid];
+
+	for (int i = 0; i < f->ncrates; ++i)
+		if (f->crates[i].x == x && f->crates[i].y == y)
+			return &f->crates[i];
 
 	return NULL;
 }
 
-struct Object* worldTargets(int x, int y)
+struct Target* worldTargets(int fid, int x, int y)
 {
-	for (int i = 0; i < g_world.ntargets; ++i)
-		if (g_world.targets[i].x == x && g_world.targets[i].y == y)
-			return &g_world.targets[i];
+	struct Floor* f = &g_world.floors[fid];
+
+	for (int i = 0; i < f->ntargets; ++i)
+		if (f->targets[i].x == x && f->targets[i].y == y)
+			return &f->targets[i];
 
 	return NULL;
 }
 
-int isWall(int x, int y)
+int isWall(int fid, int x, int y)
 {
-	int w = worldTile(g_world.wallLayer, x, y);
+	struct Floor* f = &g_world.floors[fid];
+	int w = worldTile(fid, f->wallLayer, x, y);
 
-	if (g_world.nlayers > 1)
+	if (f->nlayers > 1)
 		return w != 0;
 	else
 		return w == TILE_WALL || w == TILE_VOID;
 }
 
-int isWalkable(int x, int y)
+int isWalkable(int fid, int x, int y)
 {
-	int w = worldTile(g_world.wallLayer, x, y);
+	struct Floor* f = &g_world.floors[fid];
+	int w = worldTile(fid, f->wallLayer, x, y);
 
-	if (g_world.nlayers > 1)
+	if (f->nlayers > 1)
 		return w == 0;
 	else
 		return w == TILE_FLOOR || w == TILE_TARGET;
 }
 
-int isTargetTile(int x, int y)
+int isTargetTile(int fid, int x, int y)
 {
-	if (g_world.nlayers > 1)
-		return worldTargets(x,y) != NULL;
+	struct Floor* f = &g_world.floors[fid];
 
-	struct Object* target = &g_world.targets[g_world.ntargets];
-	while(target-- != g_world.targets)
-	{
-		if (target->x == x && target->y == y)
-			return 1;
-	}
+	if (f->nlayers > 1)
+		return worldTargets(fid, x, y) != NULL;
+
 	return 0;
 }
 
@@ -353,6 +498,8 @@ void gprintf(float x, float y, unsigned c, const char* fmt, ...);
 void quad(float x, float y, float s, unsigned c);
 void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1);
 
+void drawUi(const char* name);
+
 char* loadFile(const char *path, int *readed);
 void loadMap(const char* path);
 void loadMap_tmx(const char* path);
@@ -363,7 +510,11 @@ void loadConfig(const char* path);
 ///////////////////////////////////////////////////////////////////////////////
 
 #if _WIN32 || _MACOSX
-HSTREAM g_musicStream = 0;
+void* g_musicData;
+HSTREAM g_musicStream;
+HSAMPLE g_walkSample;
+HSAMPLE g_pushSample;
+HSAMPLE g_successSample;
 #endif
 unsigned g_mute;
 
@@ -376,15 +527,22 @@ void playMusic(const char* path)
 	strcat(data_path, path);
 
 	printf("Loading music [%s], Nick dancing in 3 2 1\n", data_path);
-	if (g_musicStream != 0 )
+
+	if (g_musicStream != 0)
 	{
 		BASS_ChannelStop(g_musicStream);
-		//BASS_StreamFree(g_musicStream);
+		BASS_StreamFree(g_musicStream);
 		g_musicStream = 0;
+		free(g_musicData);
 	}
-		
-	g_musicStream = BASS_StreamCreateFile(FALSE, data_path, 0, 0, BASS_SAMPLE_LOOP);
-	BASS_ChannelPlay(g_musicStream, 0);
+
+	if (!g_mute)
+	{
+		int n;
+		g_musicData = (void*) loadFile(data_path, &n);
+		g_musicStream = BASS_StreamCreateFile(TRUE, g_musicData, 0, n, BASS_SAMPLE_LOOP);
+		BASS_ChannelPlay(g_musicStream, 0);
+	}
 #endif
 }
 
@@ -612,17 +770,42 @@ void gameStart(float elapse, unsigned* stage)
 	}
 
 	float u0, v0, u1, v1;
-	u0 = .5f, u1 = u0 + .125f;
-	v0 = .375f, v1 = v0 + .125f;
+	const int f = (int) (.60f / .15f);
+	const int t = PLAYER_ANIM_TILE_WALKDOWN;
+
+	u0 = g_playerAnimTiles[t].frames[f].s0;
+	v0 = g_playerAnimTiles[t].frames[f].t0;
+	u1 = g_playerAnimTiles[t].frames[f].s1;
+	v1 = g_playerAnimTiles[t].frames[f].t1;
+
 	sprite(gs->px, gs->py, 128.f, TEX_PLAYER, u0, v0, u1, v1);
 
 	static const unsigned colors[] = {0x0000ff00, 0x00ffffff};
 	unsigned color = colors[gs->state];
 
+#if 1
+	// draw ui
+
+	struct UllWidget* w;
+
+	if ((w = g_uiScreens) != NULL && (w = ullFindScreen(w, "main-menu")) != NULL)
+		while (w = ullNextWidget(w), w->type != 'X')
+		{
+			char *s = NULL, t[256];
+			*t = 0;
+
+			while ((s = ullFormat(t, ullText(w), s)) != NULL)
+					if (strnicmp(s, "level", 5) == 0)
+						s = g_map_progression[g_current_map].name;
+
+			gprintf(ullX(w) / 100.f, ullY(w) / 100.f, ~0, t);
+		}
+#endif
+
 	gprintf(.5f, .5f, 0x00ff00ff, "Touchy Warehouse Keeper");
-	gprintf(.5f, .52f, 0x00ff00ff, "v0.1");
-	gprintf(.5f, .56f, 0x00ff00ff, "Map (right click to cycle): %s", g_map_progression[g_current_map].name);
-	gprintf(.5f, .60f, color, "Click to continue");
+	gprintf(.5f, .5f + g_fontSpace, 0x00ff00ff, "v0.1");
+	gprintf(.5f, .5f + g_fontSpace * 3.f, 0x00ff00ff, "Map (right click to cycle): %s", g_map_progression[g_current_map].name);
+	gprintf(.5f, .5f + g_fontSpace * 5.f, color, "Click to continue");
 
 	if (gs->hasSaveGame)
 		gprintf(.02f, .95f, 0x00ffffff, "[C]ONTINUE");
@@ -633,7 +816,7 @@ void gameStart(float elapse, unsigned* stage)
 	if (buttonDown(2))
 	{
 		++g_current_map;
-		if(g_map_progression[g_current_map].par < 0)
+		if (g_map_progression[g_current_map].par < 0)
 			g_current_map = 0;
 	}
 
@@ -699,7 +882,8 @@ struct Timer
 
 struct UndoStep
 {
-	struct Object crates[MAX_CRATES];
+	struct Crate crates[MAX_CRATES];
+	int floorId;
 	int playerx, playery;
 };
 
@@ -711,6 +895,10 @@ struct GamePlay
 	float intro;
 	struct Timer timer;
 	struct Player player;
+	int floorId;
+	int targetFloor;
+	int floorChange;
+	float floorFade;
 	struct Move move;
 	int npath;
 	struct PathNode path[128];
@@ -778,7 +966,7 @@ int pathFind(int startx, int starty, int goalx, int goaly)
 			if (j < nclosed)
 				continue;
 
-			if (isWall(x, y) || worldCrates(x, y))
+			if (isWall(gp->floorId, x, y) || worldCrates(gp->floorId, x, y))
 				continue;
 
 			for (j = 0; j < nopen; ++j)
@@ -814,21 +1002,23 @@ int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world
 
 int checkWinConditions()
 {
-	for (int i = 0; i < g_world.ncrates; ++i)
-		if (!isTargetTile(g_world.crates[i].x, g_world.crates[i].y))
+	struct GamePlay* gp = &g_gamePlay;
+	int fid = gp->floorId;
+	struct Floor* f = &g_world.floors[fid];
+
+	for (int i = 0; i < f->ncrates; ++i)
+		if (!isTargetTile(fid, f->crates[i].x, f->crates[i].y))
 			return 0;
 
 	return 1;
 }
 
-
 int getTileSize(int tile)
 {
-	for(int i=0; i<g_world.ntextures; ++i)
-	{
-		if(tile < g_world.Textures[i].max_id)
+	for (int i = 0; i < g_world.ntextures; ++i)
+		if (tile < g_world.Textures[i].max_id)
 			return g_world.Textures[i].num_tiles;
-	}
+
 	assert(0 && "Texture not found");
 	return 0;
 }
@@ -836,11 +1026,13 @@ int getTileSize(int tile)
 int getTexCoords(int tile, float *vu, float *vv, float *tilesize)
 {
 	int size = getTileSize(tile);
-	*tilesize = 1.0f/size;
-	int rel = (tile-1) % (size*size);
-	*vv = (rel / size) * (*tilesize);
-	*vu = (rel % size) * (*tilesize);
-	return NUM_TEX + 1 + (tile/(size*size));
+	*tilesize = 1.f / size;
+
+	int rel = (tile - 1) % (size * size);
+	*vv = (rel / size) * (1.f / size);
+	*vu = (rel % size) * (1.f / size);
+
+	return NUM_TEX + tile / sqr(size);
 }
 
 void gamePlay(float elapse, unsigned* stage)
@@ -860,14 +1052,21 @@ void gamePlay(float elapse, unsigned* stage)
 
 		if (!g_gameStart.loadGameOnStart)
 		{
+			destroyMapTex();
+
 			char* ext = strchr(g_map_progression[g_current_map].file, '.');
 
-			if (strcmp(ext, ".tmx") == 0)
+			if (stricmp(ext, ".tmx") == 0)
 				loadMap_tmx(g_map_progression[g_current_map].file);
 			else
 				loadMap(g_map_progression[g_current_map].file);
+
 			playMusic(g_map_progression[g_current_map].music);
 		}
+
+		gp->floorId = g_world.startFloor;
+		gp->targetFloor = g_world.startFloor;
+		gp->floorFade = 1.f;
 
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
@@ -877,12 +1076,16 @@ void gamePlay(float elapse, unsigned* stage)
 		if (g_gameStart.loadGameOnStart)
 		{
 			g_gameStart.loadGameOnStart = 0;
+
 			loadGame();
 			playMusic(g_map_progression[g_current_map].music);
 		}
 	}
 
-	int winConditions = checkWinConditions();
+	const int mx = unposX(g_mousex, ss);
+	const int my = unposY(g_mousey, ss);
+
+	int winConditions = gp->floorId != gp->targetFloor ? 0 : checkWinConditions();
 
 	if (winConditions == 1) 
 	{
@@ -891,6 +1094,7 @@ void gamePlay(float elapse, unsigned* stage)
 			playMusic("win.mp3");
 			gp->finished = 1;
 		}
+
 		if (buttonDown(0))
 		{
 			if (g_map_progression[++g_current_map].par < 0)
@@ -898,6 +1102,7 @@ void gamePlay(float elapse, unsigned* stage)
 			else
 				*stage = ~0;
 		}
+
 		goto ignore_mouse_input;
 	}
 
@@ -928,7 +1133,7 @@ void gamePlay(float elapse, unsigned* stage)
 	}
 	else if (keyDown('u') && (gp->moves > 0 || p->path >= 0 || p->move))
 	{
-		if(p->path < 0 && p->move == 0)
+		if (p->path < 0 && p->move == 0)
 			--gp->moves;
 		else
 		{
@@ -941,28 +1146,32 @@ void gamePlay(float elapse, unsigned* stage)
 			m->dx = 0;
 			m->dy = 0;
 		}
+
+		struct Floor* f = &g_world.floors[gp->floorId];
+
 		p->ix = p->x = gp->steps[gp->moves].playerx;
 		p->iy = p->y = gp->steps[gp->moves].playery;
-		memcpy(g_world.crates, gp->steps[gp->moves].crates, sizeof(struct Object) * g_world.ncrates);
+		memcpy(f->crates, gp->steps[gp->moves].crates, sizeof(struct Crate) * f->ncrates);
 	}
 
 	if (gp->stepSaved == 0)
 	{
+		struct Floor* f = &g_world.floors[gp->floorId];
+
 		gp->stepSaved = 1;
+		gp->steps[gp->moves].floorId = gp->floorId;
 		gp->steps[gp->moves].playerx = p->x;
 		gp->steps[gp->moves].playery = p->y;
-		memcpy(gp->steps[gp->moves].crates, g_world.crates, sizeof(struct Object) * g_world.ncrates);
+		memcpy(gp->steps[gp->moves].crates, f->crates, sizeof(struct Crate) * f->ncrates);
 	}
 
 	if (p->path >= 0 || p->move)
 		goto ignore_mouse_input;
 
-	const int mx = unposX(g_mousex, ss);
-	const int my = unposY(g_mousey, ss);
-
 	if (buttonDown(0))
 	{
-		struct Object* crate = worldCrates(mx, my);
+		struct Crate* crate = worldCrates(gp->floorId, mx, my);
+		struct Floor* f = &g_world.floors[gp->floorId];
 
 		m->x0 = -1;
 		m->y0 = -1;
@@ -971,7 +1180,7 @@ void gamePlay(float elapse, unsigned* stage)
 		{
 			m->x0 = mx;
 			m->y0 = my;
-			m->ci = crate - g_world.crates;
+			m->ci = crate - f->crates;
 		}
 	}
 
@@ -986,7 +1195,7 @@ void gamePlay(float elapse, unsigned* stage)
 			int n = max(mx, m->x0 - 1);
 
 			for (; i < n + 1; ++i)
-				if (!isWalkable(i, my))
+				if (!isWalkable(gp->floorId, i, my))
 					break;
 
 			if (i > n)
@@ -1001,7 +1210,7 @@ void gamePlay(float elapse, unsigned* stage)
 			int n = max(my, m->y0 - 1);
 
 			for (; i < n + 1; ++i)
-				if (!isWalkable(mx, i))
+				if (!isWalkable(gp->floorId, mx, i))
 					break;
 
 			if (i > n)
@@ -1045,7 +1254,7 @@ void gamePlay(float elapse, unsigned* stage)
 					float max_dist = 18;
 					p->speed = max_speed;
 
-					if(p->path <= min_dist)
+					if (p->path <= min_dist)
 						p->speed = min_speed;
 					else if (p->path < max_dist)
 					{
@@ -1053,12 +1262,14 @@ void gamePlay(float elapse, unsigned* stage)
 						p->speed += (min_speed - max_speed) * r;
 					}
 
-						// Trigger sounds
+					// Trigger sounds
 #if _WIN32 || _MACOSX
+					if (!g_mute)
+					{
 						BASS_ChannelStop(p->sound_channel);
-						HSAMPLE sample = BASS_SampleLoad(0, "data/walk.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
-						p->sound_channel = BASS_SampleGetChannel(sample, 0);
+						p->sound_channel = BASS_SampleGetChannel(g_walkSample, 0);
 						BASS_ChannelPlay(p->sound_channel, 1);
+					}
 #endif
 				}
 				else
@@ -1073,11 +1284,14 @@ void gamePlay(float elapse, unsigned* stage)
 				p->iy = p->y - m->dy;
 				p->time = 0.f;
 				p->move = 1;
+
 #if _WIN32 || _MACOSX
-				BASS_ChannelStop(p->sound_channel);
-				HSAMPLE sample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
-				p->sound_channel = BASS_SampleGetChannel(sample, 0);
-				BASS_ChannelPlay(p->sound_channel, 1);
+				if (!g_mute)
+				{
+					BASS_ChannelStop(p->sound_channel);
+					p->sound_channel = BASS_SampleGetChannel(g_pushSample, 0);
+					BASS_ChannelPlay(p->sound_channel, 1);
+				}
 #endif
 			}
 		}
@@ -1108,21 +1322,26 @@ ignore_mouse_input:
 				p->iy = p->y - m->dy;
 				p->move = 1;
 				p->speed = 0.55f;
+
 #if _WIN32 || _MACOSX
-				BASS_ChannelStop(p->sound_channel);
-				HSAMPLE sample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
-				p->sound_channel = BASS_SampleGetChannel(sample, 0);
-				BASS_ChannelPlay(p->sound_channel, 1);
+				if (!g_mute)
+				{
+					BASS_ChannelStop(p->sound_channel);
+					p->sound_channel = BASS_SampleGetChannel(g_pushSample, 0);
+					BASS_ChannelPlay(p->sound_channel, 1);
+				}
 #endif
 			}
 		}
 		else if (p->move)
 		{
+			struct Floor* f = &g_world.floors[gp->floorId];
+
 			m->x0 -= m->dx;
 			m->y0 -= m->dy;
 
-			g_world.crates[m->ci].x -= m->dx;
-			g_world.crates[m->ci].y -= m->dy;
+			f->crates[m->ci].x -= m->dx;
+			f->crates[m->ci].y -= m->dy;
 
 			p->ix = (p->x -= m->dx) - m->dx;
 			p->iy = (p->y -= m->dy) - m->dy;
@@ -1135,24 +1354,59 @@ ignore_mouse_input:
 				++gp->moves;
 				gp->stepSaved = 0;
 
+				for (int i = 0; i < f->nramps; ++i)
+					if (m->x1 == f->ramps[i].x && m->y1 == f->ramps[i].y)
+					{
+						int fid = gp->floorId + f->ramps[i].dir;
+						struct Floor* f2 = &g_world.floors[fid];
+
+						memcpy(
+							&f2->crates[f2->ncrates++],
+							&f->crates[m->ci],
+							sizeof(struct Crate));
+
+						if (--f->ncrates > 0)
+							memcpy(
+								&f->crates[m->ci],
+								&f->crates[f->ncrates],
+								sizeof(struct Crate));
+
+						gp->targetFloor = fid;
+						gp->floorChange = f->ramps[i].dir;
+					}
+
 				m->x0 = -1;
 				m->y0 = -1;
 				m->x1 = -1;
 				m->y1 = -1;
 				m->dx = 0;
 				m->dy = 0;
+
 #if _WIN32 || _MACOSX
-				BASS_ChannelStop(p->sound_channel);
-				if(isTargetTile(g_world.crates[m->ci].x, g_world.crates[m->ci].y))
+				if (!g_mute)
 				{
-					HSAMPLE sample = BASS_SampleLoad(0, "data/success.wav", 0, 0, 1, 0);
-					p->sound_channel = BASS_SampleGetChannel(sample, 0);
-					BASS_ChannelPlay(p->sound_channel, 1);
+					BASS_ChannelStop(p->sound_channel);
+
+					if (isTargetTile(gp->floorId, f->crates[m->ci].x, f->crates[m->ci].y))
+					{
+						p->sound_channel = BASS_SampleGetChannel(g_successSample, 0);
+						BASS_ChannelPlay(p->sound_channel, 1);
+					}
 				}
 #endif
 			}
 		}
 	}
+
+	if (gp->targetFloor != gp->floorId && gp->floorFade == 0.f)
+		gp->floorFade = 1.f;
+
+	if (gp->floorFade != 0.f)
+		if ((gp->floorFade -= elapse * .75f) <= 0.f)
+		{
+			gp->floorId = gp->targetFloor;
+			gp->floorFade = 0.f;
+		}
 
 	if (keyDown('0'))
 	{
@@ -1160,27 +1414,48 @@ ignore_mouse_input:
 		g_map_progression[g_current_map].seed = (int) (rand() / (float) RAND_MAX * 3333.f);
 	}
 
-	srand(g_map_progression[g_current_map].seed);
-	gprintf(.9f, .07f, 0x00ff00ff, "SEED %d", g_map_progression[g_current_map].seed);
+	gprintf(.9f, .05f + g_fontSpace, 0x00ff00ff, "SEED %d", g_map_progression[g_current_map].seed);
 
+	int myFloorId = gp->floorId;
+
+render_floor:
+
+	srand(g_map_progression[g_current_map].seed);
 	const float vx = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 	const float vy = floorf(rand() / (float) RAND_MAX / .5f) * .5f;
 
-	for (int n = 0; n < g_world.nlayers; ++n)
+	glPushMatrix();
+
+	if (myFloorId != gp->targetFloor)
+	{
+		glTranslatef(0.f, (float) gp->floorChange * -g_height * .25f * (1.f - gp->floorFade), 0.f);
+		glColor4f(1.f, 1.f, 1.f, gp->floorFade);
+	}
+	else if (gp->floorFade != 0.f)
+	{
+		glTranslatef(0.f, (float) gp->floorChange * g_height * .25f * gp->floorFade, 0.f);
+		glColor4f(1.f, 1.f, 1.f, 1.f - gp->floorFade);
+	}
+	else
+		glColor4f(1.f, 1.f, 1.f, 1.f);
+
+	struct Floor* f = &g_world.floors[myFloorId];
+
+	for (int n = 0; n < f->nlayers; ++n)
 	{
 		for (int y = 0; y < g_world.ny; ++y)
 		{
 			for (int x = 0; x < g_world.nx; ++x)
 			{
 				float vu,vv;
-				const int tile = worldTile(n, x, y);
+				const int tile = worldTile(myFloorId, n, x, y);
 
-				if(g_world.nlayers > 1 && tile > 0)
+				if (f->nlayers > 1 && tile > 0)
 				{
 					float tilesize;
 					int id = getTexCoords(tile, &vu, &vv, &tilesize);
 					sprite(posX(x, ss), posY(y, ss), ss, id, vu, vv, vu + tilesize, vv + tilesize);
-					
+
 					//if(n == g_world.wallLayer)
 					//{
 					//	vu = vx + floorf((.3f + .3f * sinf(x)) * (rand() / (float) RAND_MAX / .5f)) * .25f;
@@ -1219,15 +1494,20 @@ ignore_mouse_input:
 		}
 	}
 
+	if (myFloorId != gp->targetFloor)
+		glColor4f(1.f, 1.f, 1.f, gp->floorFade);
+	else
+		glColor4f(1.f, 1.f, 1.f, 1.f - gp->floorFade);
+
 	const int dx = p->ix - p->x;
 	const int dy = p->iy - p->y;
 	const float ix = dx * ss * (p->time / p->speed);
 	const float iy = dy * ss * (p->time / p->speed);
 
-	for (int i = 0; i < g_world.ncrates; ++i)
+	for (int i = 0; i < f->ncrates; ++i)
 	{
-		const int x = g_world.crates[i].x;
-		const int y = g_world.crates[i].y;
+		const int x = f->crates[i].x;
+		const int y = f->crates[i].y;
 		float xx = posX(x, ss);
 		float yy = posY(y, ss);
 		float sm = 1.f;
@@ -1245,10 +1525,10 @@ ignore_mouse_input:
 		const float ss2 = ss * .5f + ss * (cosf(t) + 1.f) * .5f;
 		const float ss3 = w * ss + (1.f - w) * ss2;
 
-		if(g_world.nlayers > 1 && g_world.crateTex != 0)
+		if (f->nlayers > 1 && g_world.crateTex != 0)
 		{
 			int tex = g_world.crateTex;
-			if (isTargetTile(x,y) && g_world.crateTargetTex != 0)
+			if (isTargetTile(gp->floorId, x, y) && g_world.crateTargetTex != 0)
 				tex = g_world.crateTargetTex;
 
 			float vv, vu, tilesize;
@@ -1259,34 +1539,76 @@ ignore_mouse_input:
 			sprite(xx, yy, ss3 * sm, TEX_CRATE, 0.f, 0.f, 1.f, 1.f);
 	}
 
-	const float s = dx || dy ? clamp(p->time / p->speed, 0.f, 1.f) : .25f;
-	float u0 = 0.f, v0 = 0.f, u1 = 1.f, v1 = 1.f;
+	glPopMatrix();
 
-	if (dx < 0.f)
-		texUvPlayer_left(u0, v0, u1, v1, s);
-	else if (dx > 0.f)
-		texUvPlayer_right(u0, v0, u1, v1, s);
-	else if (dy < 0.f)
-		texUvPlayer_up(u0, v0, u1, v1, s);
-	else if (dy > 0.f)
-		texUvPlayer_down(u0, v0, u1, v1, s);
-	else
+	if (gp->floorId != gp->targetFloor && myFloorId == gp->floorId)
 	{
-		u0 = .5f, u1 = u0 + .125f;
-		v0 = .25f, v1 = v0 + .125f;
+		myFloorId = gp->targetFloor;
+		goto render_floor;
 	}
 
-	if (p->move)
-		v0 += .5f, v1 += .5f;
+	float u0, v0, u1, v1;
+
+	if (dx || dy)
+	{
+		const float s = dx || dy ? clamp(p->time / p->speed, 0.f, 1.f) : 0.f;
+		const int f = clamp((int) (s / .15f), 0, PLAYER_ANIM_FRAME_COUNT - 1);
+		const int t =
+			dx < 0.f ? PLAYER_ANIM_TILE_WALKLEFT + p->move :
+			dx > 0.f ? PLAYER_ANIM_TILE_WALKRIGHT + p->move :
+			dy < 0.f ? PLAYER_ANIM_TILE_WALKUP + p->move :
+			dy > 0.f ? PLAYER_ANIM_TILE_WALKDOWN + p->move : -1;
+
+		u0 = g_playerAnimTiles[t].frames[f].s0;
+		v0 = g_playerAnimTiles[t].frames[f].t0;
+		u1 = g_playerAnimTiles[t].frames[f].s1;
+		v1 = g_playerAnimTiles[t].frames[f].t1;
+	}
+	else
+	{
+		const int f = (int) (.60f / .15f);
+		const int t = PLAYER_ANIM_TILE_WALKDOWN;
+
+		u0 = g_playerAnimTiles[t].frames[f].s0;
+		v0 = g_playerAnimTiles[t].frames[f].t0;
+		u1 = g_playerAnimTiles[t].frames[f].s1;
+		v1 = g_playerAnimTiles[t].frames[f].t1;
+	}
 
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
 
-	gprintf(.02f, .05f, 0x00ffffff, "LEVEL: %s", g_map_progression[g_current_map].name);
-	gprintf(.02f, .07f, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
-	gprintf(.02f, .09f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
-	gprintf(.02f, .95f, 0x00ffffff, "[U]NDO [P]AUSE  [R]ESTART");
 
-	if( g_map_progression[g_current_map].txt[0] != 0) 
+#if 1
+	// draw ui
+
+	struct UllWidget* w;
+
+	if ((w = g_uiScreens) != NULL && (w = ullFindScreen(w, "in-game")) != NULL)
+		while (w = ullNextWidget(w), w->type != 'X')
+		{
+			char *s = NULL, t[256], t2[64];
+			*t = 0;
+
+			while ((s = ullFormat(t, ullText(w), s)) != NULL)
+					if (strnicmp(s, "level", 5) == 0)
+						s = g_map_progression[g_current_map].name;
+					else if (strnicmp(s, "time", 5) == 0)
+						sprintf(s = t2, "%02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
+					else if (strnicmp(s, "moves", 5) == 0)
+						s = itoa(gp->moves, t2, 10);
+					else if (strnicmp(s, "par", 5) == 0)
+						s = itoa(g_map_progression[g_current_map].par, t2, 10);
+
+			gprintf(ullX(w) / 100.f, ullY(w) / 100.f, ~0, t);
+		}
+#else
+	gprintf(.02f, .05f, 0x00ffffff, "LEVEL: %s", g_map_progression[g_current_map].name);
+	gprintf(.02f, .05f + g_fontSpace, 0x00ffffff, "TIME:  %02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
+	gprintf(.02f, .05f + g_fontSpace * 2.f, 0x00ffffff, "MOVES: %d PAR: %d", gp->moves, g_map_progression[g_current_map].par);
+	gprintf(.02f, .95f, 0x00ffffff, "[U]NDO   [P]AUSE   [R]ESTART");
+#endif
+
+	if (g_map_progression[g_current_map].txt[0] != 0) 
 	{
 		float row = 0.05f;
 		char txt[256];
@@ -1296,7 +1618,7 @@ ignore_mouse_input:
 		while(tok != NULL)
 		{
 			gprintf(0.5f - (strlen(tok) * 0.005f), row, 0x00ffffff, tok);
-			row += 0.02f;
+			row += g_fontSpace;
 			tok = strtok(NULL, "^");
 		}
 	}
@@ -1313,6 +1635,8 @@ ignore_mouse_input:
 		gprintf(0.5 - rxsize, 0.5 - rysize, 0x00ffffff, "* LEVEL COMPLETED *");
 		gprintf(0.5 - rxsize, 0.5 - rysize + 0.05f, 0x00ffffff, " Click to continue");
 
+		glColor3f(1.f, 1.f, 1.f);
+
 		float u0, v0, u1, v1;
 		u0 = .5f, u1 = u0 + .125f;
 		v0 = .375f, v1 = v0 + .125f;
@@ -1322,7 +1646,7 @@ ignore_mouse_input:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct
+struct GameOver
 {
 	float time;
 	int count;
@@ -1344,7 +1668,7 @@ void gameOver(float elapse, unsigned* stage)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct
+struct Stage
 {
 	void* data;
 	size_t size;
@@ -1418,7 +1742,7 @@ void quad(float x, float y, float s, unsigned c)
 
 void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1)
 {
-	glColor3f(1.f, 1.f, 1.f);
+//	glColor3f(1.f, 1.f, 1.f);
 
 	glPushMatrix();
 	glTranslatef(x, y, 0.f);
@@ -1508,9 +1832,17 @@ void onDisplay()
 
 	// render game
 
+	mat4 identity;
+	mat4Identity(identity);
+
+	mat4 matrix;
+	mat4Ortho(matrix, 0.f, g_width, g_height, 0.f, -1.f, 1.f);
+
+	mat4 proj;
+	mat4Mul(proj, identity, matrix);
+
 	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluOrtho2D(0.f, g_width, g_height, 0.f);
+	glLoadMatrixf(proj);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
@@ -1518,28 +1850,43 @@ void onDisplay()
 	glClearColor(.1f, .1f, .3f, 0.f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
+	glColor4f(1.f, 1.f, 1.f, 1.f);
 	renderGame(elapse);
 
 	// render font
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, g_fontTex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	glBegin(GL_QUADS);
 
 	for (
 		struct Text* t = (struct Text*) g_textBuffer;
 		t != (struct Text*) g_textEnd;
 		t = (struct Text*) &t->string[t->length + 1])
 	{
-		glPushAttrib(GL_LIST_BIT);
-		glListBase(g_fontList);
+		float x = g_width * t->x;
+		float y = g_height * t->y;
 
-		glColor4ub(0, 0, 0, 0);
-		glRasterPos2i((int) (g_width * t->x) + 1, (int) (g_height * t->y) + 1);
-		glCallLists(t->length, GL_UNSIGNED_BYTE, t->string);
+		for (unsigned i = 0, n = t->length; i < n; ++i)
+		{
+			stbtt_aligned_quad q;
+			stbtt_GetBakedQuad(g_fontData, 512, 512, t->string[i] - 32, &x, &y, &q, 1);
 
-		glColor4ubv((unsigned char*) &t->color);
-		glRasterPos2i((int) (g_width * t->x), (int) (g_height * t->y));
-		glCallLists(t->length, GL_UNSIGNED_BYTE, t->string);
-
-		glPopAttrib();
+			glTexCoord2f(q.s0, q.t0); glVertex2f(q.x0, q.y0);
+			glTexCoord2f(q.s1, q.t0); glVertex2f(q.x1, q.y0);
+			glTexCoord2f(q.s1, q.t1); glVertex2f(q.x1, q.y1);
+			glTexCoord2f(q.s0, q.t1); glVertex2f(q.x0, q.y1);
+		}
 	}
+
+	glEnd();
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_BLEND);
 
 	g_textEnd = g_textBuffer;
 
@@ -1573,12 +1920,19 @@ char* loadFile(const char *path, int *readed)
 	fseek(fd, 0, SEEK_END);
 	size = ftell(fd);
 	rewind(fd);
-	data = (char*) malloc(size);
+	data = (char*) malloc(size + 1);
 	*readed = fread(data, 1, size, fd);
+	data[size] = 0;
 	fclose(fd);
 
 	return data;
 }
+
+struct read_progress
+{
+	const char* img;
+	unsigned int readed;
+};
 
 void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 {
@@ -1588,7 +1942,7 @@ void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 
 	while((node = mxmlIndexEnum(index)) != NULL)
 	{
-		int id = atoi(mxmlElementGetAttr(node, "id"));
+		int id = 1 + atoi(mxmlElementGetAttr(node, "id"));
 		property = mxmlFindElement(node, tree, "property", NULL, NULL, MXML_DESCEND);
 		if(property == NULL)
 			continue;
@@ -1597,137 +1951,186 @@ void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 		if(name == NULL)
 			continue;
 
-		if(stricmp(name, "crate") == 0)
+		if (stricmp(name, "crate") == 0)
 			g_world.crateTex = id;
-		else if(stricmp(name, "cratetarget") == 0)
+		else if (stricmp(name, "cratetarget") == 0)
 			g_world.crateTargetTex = id;
 		else
 			printf("Unknown property for tile %d named [%s], blame Tony\n", id, name);
 
 		mxmlDelete(property);
+		mxmlDelete(node);
 	}
+
 	mxmlIndexDelete(index);		
 }
 
 void loadMap_tmx(const char* path)
 {
-		int n = 0;
-		char data_path[PATH_NAME_SIZE] = DATA_DIR;
-		char* data = loadFile(strcat(data_path, path), &n);
+	int n = 0;
+	char data_path[PATH_NAME_SIZE] = DATA_DIR;
+	char* data = loadFile(strcat(data_path, path), &n);
 
-		memset(&g_world, 0, sizeof(g_world));
+	memset(&g_world, 0, sizeof(g_world));
 
-		mxml_node_t *tree = mxmlLoadString(NULL, data, MXML_TEXT_CALLBACK);
-		mxml_node_t *map = mxmlFindElement(tree, tree, "map", NULL, NULL, MXML_DESCEND_FIRST);
+	mxml_node_t *tree = mxmlLoadString(NULL, data, MXML_TEXT_CALLBACK);
+	mxml_node_t *map = mxmlFindElement(tree, tree, "map", NULL, NULL, MXML_DESCEND_FIRST);
 
-		g_world.nx = atoi(mxmlElementGetAttr(map, "width"));
-		g_world.ny = atoi(mxmlElementGetAttr(map, "height"));
-		int tilesize = atoi(mxmlElementGetAttr(map, "tilewidth"));
+	g_world.nx = atoi(mxmlElementGetAttr(map, "width"));
+	g_world.ny = atoi(mxmlElementGetAttr(map, "height"));
+	int tilesize = atoi(mxmlElementGetAttr(map, "tilewidth"));
 
-		printf("Map of %dx%d, tile size: %d, approved by Senta\n", g_world.nx, g_world.ny, tilesize); 
+	mxml_index_t *index, *index2, *index3;
+	mxml_node_t *node, *subnode, *node2;
 
-		mxml_index_t *index, *index2;
-		mxml_node_t *node, *subnode, *node2;
+	// Tileset loading ---
 
-		// Tileset loading ---
-		index = mxmlIndexNew(map, "tileset", NULL);
+	index = mxmlIndexNew(map, "tileset", NULL);
 
-		while((node = mxmlIndexEnum(index)) != NULL)
-		{
-			int gid = atoi(mxmlElementGetAttr(node, "firstgid"));
-			const char* tw = mxmlElementGetAttr(node, "tilewidth");
-			if(tw == NULL)
-				continue;
-			int tilesize = atoi(tw);
-			subnode = mxmlFindElement(node, tree, "image", NULL, NULL, MXML_DESCEND_FIRST);
-			const char* src = mxmlElementGetAttr(subnode, "source");
-			int w = atoi(mxmlElementGetAttr(subnode, "width"));
-			int h = atoi(mxmlElementGetAttr(subnode, "height"));
+	while((node = mxmlIndexEnum(index)) != NULL)
+	{
+		int gid = atoi(mxmlElementGetAttr(node, "firstgid"));
+		const char* tw = mxmlElementGetAttr(node, "tilewidth");
 
-			sprintf(data_path, "%s%s", DATA_DIR, src);
-			char* ext = strrchr (data_path, '.');
-			strcpy(ext, ".rgba");
-			char* img = loadFile(data_path, &n);
-			assert(n == w * h * 4);
+		if(tw == NULL)
+			continue;
 
-			int num_subtextures = (w / tilesize);
-			int tex_id = NUM_TEX + 1 + gid/(num_subtextures*num_subtextures);
-			glGenTextures(1, &g_tex[tex_id]);
-			glBindTexture(GL_TEXTURE_2D, g_tex[tex_id]);
-			glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
-			free(img);
+		int tilesize = atoi(tw);
+		subnode = mxmlFindElement(node, tree, "image", NULL, NULL, MXML_DESCEND_FIRST);
 
-			g_world.Textures[g_world.ntextures].max_id = gid + (num_subtextures*num_subtextures);
-			g_world.Textures[g_world.ntextures].num_tiles = num_subtextures;
-			//printf("Texture with max_id %d contains %dx%d squares\n", g_world.Textures[g_world.ntextures].max_id, num_subtextures, num_subtextures);
-			g_world.ntextures++;
+		const char* src = mxmlElementGetAttr(subnode, "source");
+		int w = atoi(mxmlElementGetAttr(subnode, "width"));
+		int h = atoi(mxmlElementGetAttr(subnode, "height"));
 
-			loadTileProperties(node, tree);
-			mxmlDelete(subnode);
-		}
-		mxmlIndexDelete(index);		
+		int num_subtextures = (w / tilesize);
+		int tex_id = NUM_TEX + gid / sqr(num_subtextures);
 
-		// Layer loading ---
-		index = mxmlIndexNew(map, "layer", NULL);
+		sprintf(data_path, "%s%s", DATA_DIR, src);
 
-		while((node = mxmlIndexEnum(index)) != NULL)
-		{
-			const char* name = mxmlElementGetAttr(node, "name");
-			subnode = mxmlFindElement(node, tree, "data", NULL, NULL, MXML_DESCEND_FIRST);
-			index2 = mxmlIndexNew(subnode, "tile", NULL);
-			int i = 0;
-			while((node2 = mxmlIndexEnum(index2)) != NULL)
-			{
-				g_world.tiles[g_world.nlayers][i++] = atoi(mxmlElementGetAttr(node2, "gid"));
-			}
-			if(stricmp("Walls", name) == 0)
-			{
-				g_world.wallLayer = g_world.nlayers; 
-				printf("Found wall in layer %d, Malte stills hates XML\n", g_world.wallLayer);
-			}
-			g_world.nlayers++;
-			mxmlIndexDelete(index2);
-			mxmlDelete(subnode);
-		}
-		mxmlIndexDelete(index);
+		char* img = loadFile(data_path, &n);
+		createMapTex(tex_id, img, n, w, h);
+		free(img);
 
-		// Objects loading ---
-		// Only supports one ¨objectgroup¨. Inside it only 3 types of objects are valid:
-		// - start: position were the player starts
-		// - crate: a crate will be created in that position
-		// - target: all targets need to have a crate in order to finish a level
+		g_world.Textures[g_world.ntextures].max_id = gid + sqr(num_subtextures);
+		g_world.Textures[g_world.ntextures].num_tiles = num_subtextures;
+		g_world.ntextures++;
 
-		mxml_node_t *objectsgroup = mxmlFindElement(map, tree, "objectgroup", NULL, NULL, MXML_DESCEND_FIRST);
-		index = mxmlIndexNew(objectsgroup, "object", NULL);
+		loadTileProperties(node, tree);
+		mxmlDelete(subnode);
+		mxmlDelete(node);
+	}
 
-		while((node = mxmlIndexEnum(index)) != NULL)
+	mxmlIndexDelete(index);
+
+	// Layer loading ---
+
+	index = mxmlIndexNew(map, "layer", NULL);
+
+	int nfloors = 0;
+
+	while((node = mxmlIndexEnum(index)) != NULL)
+	{
+		const char* name = mxmlElementGetAttr(node, "name");
+		subnode = mxmlFindElement(node, tree, "data", NULL, NULL, MXML_DESCEND_FIRST);
+		index2 = mxmlIndexNew(subnode, "tile", NULL);
+
+		char bare[32] = {0};
+		int fid = 1;
+		sscanf(name, "%31[A-Za-z]-%d", bare, &fid);
+		nfloors = max(nfloors, fid);
+		fid -= 1;
+
+		struct Floor* f = &g_world.floors[fid];
+
+		for (unsigned i = 0; (node2 = mxmlIndexEnum(index2)) != NULL; ++i)
+			f->tiles[f->nlayers][i] = atoi(mxmlElementGetAttr(node2, "gid"));
+
+		if (stricmp("walls", bare) == 0)
+			f->wallLayer = f->nlayers; 
+
+		f->nlayers++;
+		mxmlIndexDelete(index2);
+		mxmlDelete(subnode);
+		mxmlDelete(node);
+	}
+
+	mxmlIndexDelete(index);
+
+	// Objects loading ---
+	// Only supports one ¨objectgroup¨. Inside it only 3 types of objects are valid:
+	// - start: position were the player starts
+	// - crate: a crate will be created in that position
+	// - target: all targets need to have a crate in order to finish a level
+
+	index2 = mxmlIndexNew(map, "objectgroup", NULL);
+
+	while((node2 = mxmlIndexEnum(index2)) != NULL)
+	{
+		const char* name = mxmlElementGetAttr(node2, "name");
+
+		char bare[32] = {0};
+		int fid = 1;
+		sscanf(name, "%31[A-Za-z]-%d", bare, &fid);
+		fid -= 1;
+		assert(fid >= 0 && fid < nfloors);
+
+		struct Floor* f = &g_world.floors[fid];
+
+		index3 = mxmlIndexNew(node2, "object", NULL);
+
+		while((node = mxmlIndexEnum(index3)) != NULL)
 		{
 			int x = atoi(mxmlElementGetAttr(node, "x")) / tilesize;
 			int y = atoi(mxmlElementGetAttr(node, "y")) / tilesize;
 			const char* type = mxmlElementGetAttr(node, "type");
-			if(strcmp(type, "start") == 0)
+
+			if (stricmp(type, "start") == 0)
 			{
 				g_world.startx = x;
 				g_world.starty = y;
+				g_world.startFloor = fid;
 			}
-			if(strcmp(type, "crate") == 0)
+			else if (stricmp(type, "crate") == 0)
 			{
-				g_world.crates[g_world.ncrates].x = x;
-				g_world.crates[g_world.ncrates].y = y;
-				g_world.ncrates++;
+				f->crates[f->ncrates].x = x;
+				f->crates[f->ncrates].y = y;
+				f->ncrates++;
 			}
-			if(strcmp(type, "target") == 0)
+			else if (stricmp(type, "target") == 0)
 			{
-				g_world.targets[g_world.ntargets].x = x;
-				g_world.targets[g_world.ntargets].y = y;
-				g_world.ntargets++;
+				f->targets[f->ntargets].x = x;
+				f->targets[f->ntargets].y = y;
+				f->ntargets++;
 			}
-		}
-		mxmlIndexDelete(index);
+			else if (stricmp(type, "ramp-up") == 0)
+			{
+				f->ramps[f->nramps].x = x;
+				f->ramps[f->nramps].y = y;
+				f->ramps[f->nramps].dir = 1;
+				f->nramps++;
+			}
+			else if (stricmp(type, "ramp-down") == 0)
+			{
+				f->ramps[f->nramps].x = x;
+				f->ramps[f->nramps].y = y;
+				f->ramps[f->nramps].dir = -1;
+				f->nramps++;
+			}
 
-		// ----------------------
-		mxmlDelete(tree);
-		free(data);
+			mxmlDelete(node);
+		}
+
+		mxmlIndexDelete(index3);
+		mxmlDelete(node2);
+	}
+
+	mxmlIndexDelete(index2);
+
+	// ----------------------
+
+	mxmlDelete(map);
+	mxmlDelete(tree);
+	free(data);
 }
 
 void loadMap(const char* path)
@@ -1738,9 +2141,10 @@ void loadMap(const char* path)
 
 		memset(&g_world, 0, sizeof(g_world));
 
-		struct Object* crate = g_world.crates;
-		struct Object* target = g_world.targets;
-		unsigned char* dst = g_world.tiles[0];
+		struct Floor* f = &g_world.floors[0];
+		struct Crate* crate = f->crates;
+		struct Target* target = f->targets;
+		unsigned char* dst = f->tiles[0];
 		char* src = data;
 
 		for (int i = 0, x = 0; i < n; ++i)
@@ -1766,9 +2170,9 @@ void loadMap(const char* path)
 			g_world.nx = max(g_world.nx, x);
 		}
 
-		g_world.ncrates = crate - g_world.crates;
-		g_world.ntargets = target - g_world.targets;
-		g_world.nlayers = 1;
+		f->ncrates = crate - f->crates;
+		f->ntargets = target - f->targets;
+		f->nlayers = 1;
 		free(data);
 }
 
@@ -1889,6 +2293,25 @@ void loadConfig(const char* path)
 	g_map_progression[++map].par = -1; // watermark
 }
 
+void loadFont(const char* name, unsigned size)
+{
+	char path[256];
+	snprintf(path, 256, "data/%s", name);
+
+	int n;
+	unsigned char* data = (unsigned char*) loadFile(path, &n);
+	unsigned char* tmp = (unsigned char*) malloc(512 * 512);
+
+	stbtt_BakeFontBitmap(data, 0, (float) size, tmp, 512, 512, 32, 96, g_fontData);
+
+	glGenTextures(1, &g_fontTex);
+	glBindTexture(GL_TEXTURE_2D, g_fontTex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 512, 512, 0, GL_ALPHA, GL_UNSIGNED_BYTE, tmp);
+
+	free(data);
+	free(tmp);
+}
+
 void onFile(char* path)
 {
 	char* ext;
@@ -1898,7 +2321,7 @@ void onFile(char* path)
 	if ((ext = strchr(path, '.')) == NULL)
 		return;
 
-	if (strcmp(ext, ".rgba") == 0)
+	if (stricmp(ext, ".rgba") == 0)
 	{
 		char name[64];
 		int w, h, i;
@@ -1907,7 +2330,7 @@ void onFile(char* path)
 			return;
 
 		for (i = 0; i < NUM_TEX; ++i)
-			if (strcmp(g_texnames[i], name) == 0)
+			if (stricmp(g_texnames[i], name) == 0)
 				break;
 
 		if (i == NUM_TEX)
@@ -1921,10 +2344,109 @@ void onFile(char* path)
 		glTexImage2D(GL_TEXTURE_2D, 0, 4, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		free(data);
 	}
-	else if (strcmp(ext, ".cfg") == 0)
+	else if (stricmp(ext, ".cfg") == 0)
 	{
 		loadConfig(path);
 	}
+	else if (stricmp(ext, ".txt") == 0)
+	{
+		FILE* fd = fopen(path, "rb");
+
+		for (; g_nprefs < arrayCount(g_prefs); ++g_nprefs)
+			if (fscanf(fd, "%15s = %63s", g_prefs[g_nprefs].name, g_prefs[g_nprefs].value) == EOF)
+				break;
+
+		fclose(fd);
+	}
+	else if (!stricmp(ext, ".tmx")) {
+		char name[64];
+		char fullpath[256];
+
+		if (sscanf(path, "%*[^/]/%64[^.]", name) != 1)
+			return;
+
+		if (!strcmp(name, "playeranims")) {
+			data = loadFile(path, &n);
+
+			// parse tmx data
+
+			char* p = data;
+			char* x = p;
+			int sw = 0, sh = 0;
+
+			while ((p = strpbrk(p, "<")) != NULL) {
+				n = strcspn(++p, " ") + 1;
+
+				if (!strncmp(p, "map ", n))
+					p = strstr(p, "width=") + 7, *x++ = (char) atoi(p),
+					p = strstr(p, "height=") + 8, *x++ = (char) atoi(p),
+					p = strstr(p, "tilewidth=") + 11, *x++ = (char) atoi(p),
+					p = strstr(p, "tileheight=") + 12, *x++ = (char) atoi(p);
+				else if (!strncmp(p, "image ", n))
+					p = strstr(p, "source=") + 8, n = strcspn(p, "\""),
+					strncpy(x, p, n), x[n++] = 0, x += n,
+					p = strstr(p, "width=") + 7, sw = atoi(p),
+					p = strstr(p, "height=") + 8, sh = atoi(p);
+				else if (!strncmp(p, "tile ", n))
+					p = strstr(p, "id=") + 4, *x++ = (char) atoi(p);
+				else if (!strncmp(p, "property ", n))
+					p = strstr(p, "name=") + 6, n = strcspn(p, "\""),
+					strncpy(x, p, n), x[n++] = 0, x += n,
+					p = strstr(p, "value=") + 7, *x++ = (char) atoi(p);
+			}
+
+			*x++ = 0;
+
+			// compile texcoords for animation frames
+
+			struct PlayerAnimInfo* pai = (struct PlayerAnimInfo*) data;
+			struct PlayerAnimTile* pat = (struct PlayerAnimTile*) x;
+			char* s = pai->source + strlen(pai->source) + 1;
+			int m = pai->width * pai->height * sizeof(struct PlayerAnimTile);
+			int nx = sw / pai->tileWidth;
+			int ny = sh / pai->tileHeight;
+
+			while (*s) {
+				// let j = tile type, k = tile index, f = frame index
+
+				int j, k = *s++;
+				for (j = 0; j < arrayCount(g_playerAnimTileNames) &&
+					strcmp(s, g_playerAnimTileNames[j]); ++j);
+				s += strlen(s) + 1;
+				int f = *s++ - 1;
+
+				if (j < arrayCount(g_playerAnimTileNames))
+					pat[j].frames[f].s0 = (k % nx) * (1.f / nx),
+					pat[j].frames[f].t0 = (k / ny) * (1.f / ny),
+					pat[j].frames[f].s1 = (k % nx) * (1.f / nx) + (1.f / nx),
+					pat[j].frames[f].t1 = (k / ny) * (1.f / ny) + (1.f / ny);
+			}
+
+			g_playerAnimInfo = pai;
+			g_playerAnimTiles = pat;
+
+			// load anim texture
+
+			snprintf(fullpath, sizeof fullpath, "data/%s", pai->source);
+			data = loadFile(fullpath, &n);
+
+			unsigned char* image_data = stbi_load_from_memory(
+				(const unsigned char*) data, n, &sw, &sh, &m, 0);
+
+			glGenTextures(1, &g_tex[TEX_PLAYER]);
+			glBindTexture(GL_TEXTURE_2D, g_tex[TEX_PLAYER]);
+			glTexImage2D(GL_TEXTURE_2D, 0, 4, sw, sh, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+			free(image_data);
+			free(data);
+		}
+	}
+#if 1
+	else if (stricmp(ext, ".ull") == 0)
+	{
+		if (data = loadFile(path, &n), ullCompile(data) >= 0)
+			g_uiScreens = (struct UllWidget*) data;
+	}
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1964,31 +2486,36 @@ void init(int* argc, char* argv[])
 
 	glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF);
 
-	// init font
-
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	g_fontList = glGenLists(256);
-
-	for (int i = 0, j = ' '; j < 256; i += 2, ++j)
-	{
-		glNewList(g_fontList + j, GL_COMPILE);
-		glBitmap(8, 8, 0.f, 0.f, 8.f, 0.f, (unsigned char*) &g_font[i]);
-		glEndList();
-	}
-
-	g_textEnd = g_textBuffer;
-
 	// init bass
 
 #if _WIN32 || _MACOSX
 	BASS_Init(-1, 44100, 0, 0, NULL);
-	if (g_mute == 1)
-		BASS_SetVolume(0.0f);
+	g_pushSample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
+	g_walkSample = BASS_SampleLoad(0, "data/walk.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
+	g_successSample = BASS_SampleLoad(0, "data/success.wav", 0, 0, 1, 0);
 #endif
 
 	// load data
 
 	_foreach_file("data", onFile);
+
+	// init font
+
+	char* fontName = NULL;
+	unsigned fontSize = 16;
+
+	for (unsigned i = 0, n = g_nprefs; i < n; ++i)
+		if (stricmp(g_prefs[i].name, "font-name") == 0)
+			fontName = g_prefs[i].value;
+		else if (stricmp(g_prefs[i].name, "font-size") == 0)
+			fontSize = atoi(g_prefs[i].value);
+		else if (stricmp(g_prefs[i].name, "font-space") == 0)
+			g_fontSpace = atof(g_prefs[i].value);
+
+	if (fontName != NULL)
+		loadFont(fontName, fontSize);
+
+	g_textEnd = g_textBuffer;
 }
 
 void end()
@@ -2003,7 +2530,7 @@ int main(int argc, char* argv[])
 {
 	for (int i = 0; i < argc; ++i)
 	{
-		if (!strcmp(argv[i], "-mute"))
+		if (stricmp(argv[i], "-mute") == 0)
 			g_mute = 1;
 	}
 
