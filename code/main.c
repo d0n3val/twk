@@ -130,6 +130,7 @@ extern unsigned char *stbi_load_from_memory(
 
 #if __linux__ || _MACOSX
 # define stricmp(s,t) strcasecmp((s), (t))
+# define strnicmp(s,t,n) strncasecmp((s), (t), (n))
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1595,9 +1596,9 @@ render_floor:
 					else if (strnicmp(s, "time", 5) == 0)
 						sprintf(s = t2, "%02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
 					else if (strnicmp(s, "moves", 5) == 0)
-						s = itoa(gp->moves, t2, 10);
+						sprintf(s = t2, "%d", gp->moves);
 					else if (strnicmp(s, "par", 5) == 0)
-						s = itoa(g_map_progression[g_current_map].par, t2, 10);
+						sprintf(s = t2, "%d", g_map_progression[g_current_map].par);
 
 			gprintf(ullX(w) / 100.f, ullY(w) / 100.f, ~0, t);
 		}

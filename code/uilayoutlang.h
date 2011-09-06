@@ -76,9 +76,8 @@ static int ullCompile(char* s)
 		if (strncmp(t, "scene", 5))
 			return fprintf(stderr, "Expected scene definition\n"), -1;
 
-next_scene:
 		if ((name = strtok(NULL, ws)) == NULL)
-			return fprintf(stderr, "Expected scene name\n", t), -1;
+			return fprintf(stderr, "Expected scene name\n"), -1;
 
 		*p++ = 'S';
 		*p++ = (char) (n = strlen(name) + 1);
