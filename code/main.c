@@ -635,7 +635,7 @@ void gameStart(float elapse, unsigned* stage)
 	if (!gs->init || g_reshape)
 	{
 		gs->init = 1;
-		playMusic("menu.mp3");
+		playMusic("music/menu.mp3");
 		g_current_map = 0;
 
 		gs->mx = g_mousex;
@@ -1087,7 +1087,7 @@ void gamePlay(float elapse, unsigned* stage)
 	{
 		if (gp->finished == 0) 
 		{
-			playMusic("win.mp3");
+			playMusic("music/win.mp3");
 			gp->finished = 1;
 		}
 
@@ -2486,9 +2486,9 @@ void init(int* argc, char* argv[])
 
 #if _WIN32 || _MACOSX
 	BASS_Init(-1, 44100, 0, 0, NULL);
-	g_pushSample = BASS_SampleLoad(0, "data/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
-	g_walkSample = BASS_SampleLoad(0, "data/walk.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
-	g_successSample = BASS_SampleLoad(0, "data/success.wav", 0, 0, 1, 0);
+	g_pushSample = BASS_SampleLoad(0, "data/soundfx/push.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
+	g_walkSample = BASS_SampleLoad(0, "data/soundfx/walk.wav", 0, 0, 1, BASS_SAMPLE_LOOP);
+	g_successSample = BASS_SampleLoad(0, "data/soundfx/success.wav", 0, 0, 1, 0);
 #endif
 
 	// load data
