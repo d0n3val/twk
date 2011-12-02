@@ -1,1 +1,1 @@
-gcc -std=gnu99 -Wall -Wextra -O2 -o twk.app -framework GLUT -framework OpenGL -D_MACOSX code/*.c ./libbass.dylib
+gcc -std=gnu99 -Wall -Wextra -Wno-unused-function -Wno-sign-compare -Wno-missing-field-initializers -Wno-unused-variable -Wno-unused-parameter -O2 -I. -I/usr/include/malloc -o twk.app -framework GLUT -framework OpenGL -D_MACOSX code/*.c ./libbass.dylib mxml/libmxml.macho.a
