@@ -32,7 +32,7 @@
 # include "bass/bass.h"
 # define uint unsigned int
 #endif
-#if __linux__ || _WIN32
+#if __linux__ || _WIN32 || __APPLE__
 # include "mxml/mxml.h"
 #endif
 #define STB_TRUETYPE_IMPLEMENTATION
