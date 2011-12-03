@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="4" height="4" tilewidth="32" tileheight="32">
+ <tileset firstgid="1" name="warp" tilewidth="32" tileheight="32">
+  <image source="textures/warp.png" width="128" height="128"/>
+  <tile id="0">
+   <properties>
+    <property name="warp" value="1"/>
+   </properties>
+  </tile>
+  <tile id="1">
+   <properties>
+    <property name="warp" value="2"/>
+   </properties>
+  </tile>
+  <tile id="2">
+   <properties>
+    <property name="warp" value="3"/>
+   </properties>
+  </tile>
+  <tile id="3">
+   <properties>
+    <property name="warp" value="4"/>
+   </properties>
+  </tile>
+  <tile id="4">
+   <properties>
+    <property name="warp" value="5"/>
+   </properties>
+  </tile>
+  <tile id="5">
+   <properties>
+    <property name="warp" value="6"/>
+   </properties>
+  </tile>
+  <tile id="6">
+   <properties>
+    <property name="warp" value="7"/>
+   </properties>
+  </tile>
+  <tile id="7">
+   <properties>
+    <property name="warp" value="8"/>
+   </properties>
+  </tile>
+  <tile id="8">
+   <properties>
+    <property name="warp" value="9"/>
+   </properties>
+  </tile>
+  <tile id="9">
+   <properties>
+    <property name="warp" value="10"/>
+   </properties>
+  </tile>
+  <tile id="10">
+   <properties>
+    <property name="warp" value="11"/>
+   </properties>
+  </tile>
+  <tile id="11">
+   <properties>
+    <property name="warp" value="12"/>
+   </properties>
+  </tile>
+  <tile id="12">
+   <properties>
+    <property name="warp" value="13"/>
+   </properties>
+  </tile>
+  <tile id="13">
+   <properties>
+    <property name="warp" value="14"/>
+   </properties>
+  </tile>
+  <tile id="14">
+   <properties>
+    <property name="warp" value="15"/>
+   </properties>
+  </tile>
+  <tile id="15">
+   <properties>
+    <property name="warp" value="16"/>
+   </properties>
+  </tile>
+ </tileset>
+ <layer name="Tile Layer 1" width="4" height="4">
+  <data>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+  </data>
+ </layer>
+</map>
