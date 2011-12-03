@@ -2,6 +2,16 @@
 <map version="1.0" orientation="orthogonal" width="16" height="16" tilewidth="32" tileheight="32">
  <tileset firstgid="1" name="TWK_locomotion" tilewidth="32" tileheight="32">
   <image source="isoplayer_256x256.png" width="256" height="256"/>
+  <tile id="0">
+   <properties>
+    <property name="idle" value="1"/>
+   </properties>
+  </tile>
+  <tile id="1">
+   <properties>
+    <property name="walkdownright" value="1"/>
+   </properties>
+  </tile>
   <tile id="2">
    <properties>
     <property name="walkright" value="1"/>
@@ -30,6 +40,16 @@
   <tile id="7">
    <properties>
     <property name="walkright" value="6"/>
+   </properties>
+  </tile>
+  <tile id="8">
+   <properties>
+    <property name="idle" value="2"/>
+   </properties>
+  </tile>
+  <tile id="9">
+   <properties>
+    <property name="walkdownleft" value="1"/>
    </properties>
   </tile>
   <tile id="10">
@@ -62,6 +82,16 @@
     <property name="walkleft" value="6"/>
    </properties>
   </tile>
+  <tile id="16">
+   <properties>
+    <property name="idle" value="3"/>
+   </properties>
+  </tile>
+  <tile id="17">
+   <properties>
+    <property name="walkupleft" value="1"/>
+   </properties>
+  </tile>
   <tile id="18">
    <properties>
     <property name="walkdown" value="1"/>
@@ -90,6 +120,16 @@
   <tile id="23">
    <properties>
     <property name="walkdown" value="6"/>
+   </properties>
+  </tile>
+  <tile id="24">
+   <properties>
+    <property name="idle" value="4"/>
+   </properties>
+  </tile>
+  <tile id="25">
+   <properties>
+    <property name="walkupright" value="1"/>
    </properties>
   </tile>
   <tile id="26">
@@ -122,6 +162,16 @@
     <property name="walkup" value="6"/>
    </properties>
   </tile>
+  <tile id="32">
+   <properties>
+    <property name="idle" value="5"/>
+   </properties>
+  </tile>
+  <tile id="33">
+   <properties>
+    <property name="dance" value="1"/>
+   </properties>
+  </tile>
   <tile id="34">
    <properties>
     <property name="pushright" value="1"/>
@@ -150,6 +200,16 @@
   <tile id="39">
    <properties>
     <property name="pushright" value="6"/>
+   </properties>
+  </tile>
+  <tile id="40">
+   <properties>
+    <property name="idle" value="6"/>
+   </properties>
+  </tile>
+  <tile id="41">
+   <properties>
+    <property name="dance" value="2"/>
    </properties>
   </tile>
   <tile id="42">
@@ -182,6 +242,16 @@
     <property name="pushleft" value="6"/>
    </properties>
   </tile>
+  <tile id="48">
+   <properties>
+    <property name="idle" value="7"/>
+   </properties>
+  </tile>
+  <tile id="49">
+   <properties>
+    <property name="dance" value="3"/>
+   </properties>
+  </tile>
   <tile id="50">
    <properties>
     <property name="pushdown" value="1"/>
@@ -210,6 +280,16 @@
   <tile id="55">
    <properties>
     <property name="pushdown" value="6"/>
+   </properties>
+  </tile>
+  <tile id="56">
+   <properties>
+    <property name="idle" value="8"/>
+   </properties>
+  </tile>
+  <tile id="57">
+   <properties>
+    <property name="dance" value="4"/>
    </properties>
   </tile>
   <tile id="58">

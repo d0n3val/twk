@@ -780,7 +780,7 @@
  </layer>
  <layer name="Walls" width="29" height="13">
   <data>
-   <tile gid="9"/>
+   <tile gid="11"/>
    <tile gid="1"/>
    <tile gid="1"/>
    <tile gid="1"/>
@@ -808,7 +808,7 @@
    <tile gid="1"/>
    <tile gid="1"/>
    <tile gid="1"/>
-   <tile gid="10"/>
+   <tile gid="12"/>
    <tile gid="17"/>
    <tile gid="0"/>
    <tile gid="0"/>
@@ -854,7 +854,7 @@
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="9"/>
+   <tile gid="11"/>
    <tile gid="1"/>
    <tile gid="1"/>
    <tile gid="1"/>
@@ -864,12 +864,12 @@
    <tile gid="1"/>
    <tile gid="1"/>
    <tile gid="1"/>
-   <tile gid="10"/>
+   <tile gid="12"/>
    <tile gid="0"/>
    <tile gid="17"/>
    <tile gid="17"/>
    <tile gid="0"/>
-   <tile gid="9"/>
+   <tile gid="11"/>
    <tile gid="1"/>
    <tile gid="1"/>
    <tile gid="1"/>
@@ -879,111 +879,9 @@
    <tile gid="1"/>
    <tile gid="1"/>
    <tile gid="1"/>
-   <tile gid="10"/>
+   <tile gid="12"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="17"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="17"/>
-   <tile gid="0"/>
-   <tile gid="17"/>
-   <tile gid="17"/>
-   <tile gid="0"/>
-   <tile gid="9"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="10"/>
-   <tile gid="0"/>
-   <tile gid="17"/>
-   <tile gid="0"/>
-   <tile gid="9"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="10"/>
-   <tile gid="0"/>
-   <tile gid="17"/>
-   <tile gid="17"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="17"/>
-   <tile gid="17"/>
-   <tile gid="0"/>
-   <tile gid="9"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="10"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="9"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="10"/>
-   <tile gid="0"/>
-   <tile gid="17"/>
-   <tile gid="17"/>
    <tile gid="0"/>
    <tile gid="17"/>
    <tile gid="0"/>
@@ -996,6 +894,50 @@
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="17"/>
+   <tile gid="0"/>
+   <tile gid="17"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
+   <tile gid="19"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="20"/>
+   <tile gid="0"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
+   <tile gid="19"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="20"/>
+   <tile gid="0"/>
+   <tile gid="17"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
@@ -1014,6 +956,35 @@
    <tile gid="17"/>
    <tile gid="17"/>
    <tile gid="0"/>
+   <tile gid="11"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="12"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="0"/>
+   <tile gid="17"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
    <tile gid="17"/>
    <tile gid="0"/>
    <tile gid="0"/>
@@ -1027,36 +998,8 @@
    <tile gid="17"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="9"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="10"/>
-   <tile gid="17"/>
-   <tile gid="17"/>
-   <tile gid="0"/>
-   <tile gid="17"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="17"/>
-   <tile gid="0"/>
-   <tile gid="0"/>
-   <tile gid="9"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
@@ -1070,22 +1013,21 @@
    <tile gid="0"/>
    <tile gid="17"/>
    <tile gid="17"/>
+   <tile gid="0"/>
    <tile gid="17"/>
    <tile gid="0"/>
-   <tile gid="9"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="1"/>
-   <tile gid="10"/>
    <tile gid="0"/>
    <tile gid="0"/>
-   <tile gid="9"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="11"/>
    <tile gid="1"/>
    <tile gid="1"/>
    <tile gid="1"/>
@@ -1101,6 +1043,64 @@
    <tile gid="17"/>
    <tile gid="17"/>
    <tile gid="0"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="17"/>
+   <tile gid="17"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
+   <tile gid="19"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="20"/>
+   <tile gid="0"/>
+   <tile gid="0"/>
+   <tile gid="19"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="1"/>
+   <tile gid="20"/>
+   <tile gid="17"/>
+   <tile gid="17"/>
+   <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="0"/>
@@ -1128,7 +1128,7 @@
    <tile gid="0"/>
    <tile gid="0"/>
    <tile gid="17"/>
-   <tile gid="9"/>
+   <tile gid="19"/>
    <tile gid="1"/>
    <tile gid="1"/>
    <tile gid="1"/>
@@ -1156,7 +1156,7 @@
    <tile gid="1"/>
    <tile gid="1"/>
    <tile gid="1"/>
-   <tile gid="10"/>
+   <tile gid="20"/>
   </data>
  </layer>
  <layer name="decoration" width="29" height="13">
@@ -1546,82 +1546,82 @@
     <property name="start" value="1"/>
    </properties>
   </object>
-  <object name="crate" type="crate" x="481" y="193" width="32" height="32">
+  <object name="crate" type="crate" x="480" y="192" width="32" height="32">
    <properties>
     <property name="crate" value="1"/>
    </properties>
   </object>
-  <object name="crate" type="crate" x="422" y="198" width="32" height="32">
+  <object name="crate" type="crate" x="416" y="192" width="32" height="32">
    <properties>
     <property name="crate" value="1"/>
    </properties>
   </object>
-  <object name="crate" type="crate" x="481" y="160" width="32" height="32">
+  <object name="crate" type="crate" x="480" y="160" width="32" height="32">
    <properties>
     <property name="crate" value="1"/>
    </properties>
   </object>
-  <object name="target" type="target" x="33" y="256" width="32" height="32">
+  <object name="target" type="target" x="32" y="256" width="32" height="32">
    <properties>
     <property name="target" value="1"/>
    </properties>
   </object>
-  <object name="target" type="target" x="866" y="352" width="32" height="32">
+  <object name="target" type="target" x="864" y="352" width="32" height="32">
    <properties>
     <property name="target" value="1"/>
    </properties>
   </object>
-  <object name="target" type="target" x="37" y="357" width="32" height="32">
+  <object name="target" type="target" x="32" y="352" width="32" height="32">
    <properties>
     <property name="target" value="1"/>
    </properties>
   </object>
-  <object name="crate" type="crate" x="452" y="193" width="32" height="32">
+  <object name="crate" type="crate" x="448" y="192" width="32" height="32">
    <properties>
     <property name="crate" value="1"/>
    </properties>
   </object>
-  <object name="crate" type="crate" x="422" y="161" width="32" height="32">
+  <object name="crate" type="crate" x="416" y="160" width="32" height="32">
    <properties>
     <property name="crate" value="1"/>
    </properties>
   </object>
-  <object name="crate" type="crate" x="480" y="129" width="32" height="32">
+  <object name="crate" type="crate" x="480" y="128" width="32" height="32">
    <properties>
     <property name="crate" value="1"/>
    </properties>
   </object>
-  <object name="target" type="target" x="871" y="67" width="32" height="32">
+  <object name="target" type="target" x="864" y="64" width="32" height="32">
    <properties>
     <property name="target" value="1"/>
    </properties>
   </object>
-  <object name="target" type="target" x="32" y="131" width="32" height="32">
+  <object name="target" type="target" x="32" y="128" width="32" height="32">
    <properties>
     <property name="target" value="1"/>
    </properties>
   </object>
-  <object name="target" type="target" x="870" y="35" width="32" height="32">
+  <object name="target" type="target" x="864" y="32" width="32" height="32">
    <properties>
     <property name="target" value="1"/>
    </properties>
   </object>
-  <object name="target" type="target" x="32" y="34" width="32" height="32">
+  <object name="target" type="target" x="32" y="32" width="32" height="32">
    <properties>
     <property name="target" value="1"/>
    </properties>
   </object>
-  <object name="target" type="target" x="872" y="226" width="32" height="32">
+  <object name="target" type="target" x="864" y="224" width="32" height="32">
    <properties>
     <property name="target" value="1"/>
    </properties>
   </object>
-  <object name="crate" type="crate" x="422" y="122" width="32" height="32">
+  <object name="crate" type="crate" x="416" y="128" width="32" height="32">
    <properties>
     <property name="crate" value="1"/>
    </properties>
   </object>
-  <object name="crate" type="crate" x="382" y="357" width="32" height="32">
+  <object name="crate" type="crate" x="384" y="352" width="32" height="32">
    <properties>
     <property name="crate" value="1"/>
    </properties>
