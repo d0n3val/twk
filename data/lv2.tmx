@@ -4,12 +4,17 @@
   <image source="textures/hospital_set.png" width="256" height="256"/>
   <tile id="5">
    <properties>
-    <property name="cratetarget" value=""/>
+    <property name="target" value=""/>
    </properties>
   </tile>
   <tile id="6">
    <properties>
     <property name="crate" value=""/>
+   </properties>
+  </tile>
+  <tile id="7">
+   <properties>
+    <property name="cratetarget" value=""/>
    </properties>
   </tile>
  </tileset>
