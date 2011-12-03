@@ -2292,7 +2292,7 @@ void loadConfig(const char* path)
 void loadFont(const char* name, unsigned size)
 {
 	char path[256];
-	snprintf(path, 256, "data/%s", name);
+	snprintf(path, 256, "data/fonts/%s", name);
 
 	int n;
 	unsigned char* data = (unsigned char*) loadFile(path, &n);
@@ -2423,7 +2423,7 @@ void onFile(char* path)
 
 			// load anim texture
 
-			snprintf(fullpath, sizeof fullpath, "data/%s", pai->source);
+			snprintf(fullpath, sizeof fullpath, "data/sprites/%s", pai->source);
 			data = loadFile(fullpath, &n);
 
 			unsigned char* image_data = stbi_load_from_memory(
