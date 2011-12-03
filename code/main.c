@@ -2317,7 +2317,7 @@ void onFile(char* path)
 	if ((ext = strchr(path, '.')) == NULL)
 		return;
 
-	if (stricmp(ext, ".rgba") == 0)
+	if (stricmp(ext, ".png") == 0)
 	{
 		char name[64];
 		int w, h, i;
@@ -2333,7 +2333,7 @@ void onFile(char* path)
 			return;
 
 		data = loadFile(path, &n);
-		assert(n == w * h * 4);
+//		assert(n == w * h * 4);
 
 		glGenTextures(1, &g_tex[i]);
 		glBindTexture(GL_TEXTURE_2D, g_tex[i]);
@@ -2423,7 +2423,7 @@ void onFile(char* path)
 
 			// load anim texture
 
-			snprintf(fullpath, sizeof fullpath, "data/sprites/%s", pai->source);
+			snprintf(fullpath, sizeof fullpath, "data/%s", pai->source);
 			data = loadFile(fullpath, &n);
 
 			unsigned char* image_data = stbi_load_from_memory(
