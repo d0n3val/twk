@@ -18,9 +18,6 @@
    </properties>
   </tile>
  </tileset>
- <tileset firstgid="65" name="shadows_256" tilewidth="32" tileheight="32">
-  <image source="textures/shadows_256x256.png" width="256" height="256"/>
- </tileset>
  <layer name="floor" width="15" height="10">
   <data>
    <tile gid="16"/>
