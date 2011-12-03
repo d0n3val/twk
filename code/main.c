@@ -2380,7 +2380,7 @@ void onFile(char* path)
 					p = strstr(p, "tileheight=") + 12, *x++ = (char) atoi(p);
 				else if (!strncmp(p, "image ", n))
 					p = strstr(p, "source=") + 8, n = strcspn(p, "\""),
-					strncpy(x, p, n), x[n++] = 0, x += n,
+					strncpy(x, p, n), x[n++] = 0, x[n++] = 1, x += n,
 					p = strstr(p, "width=") + 7, sw = atoi(p),
 					p = strstr(p, "height=") + 8, sh = atoi(p);
 				else if (!strncmp(p, "tile ", n))
@@ -2401,6 +2401,9 @@ void onFile(char* path)
 			int m = pai->width * pai->height * sizeof(struct PlayerAnimTile);
 			int nx = sw / pai->tileWidth;
 			int ny = sh / pai->tileHeight;
+
+			while (*s != 1)
+				++s;
 
 			while (*s) {
 				// let j = tile type, k = tile index, f = frame index
