@@ -11,3 +11,4 @@ scene in-game
 	label 2x5+0+0 center {Moves: $moves Par: $par}
 	label 2x95+700+0 center {[U]ndo   [P]ause   [R]estart}
 end
+

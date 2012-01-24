@@ -527,7 +527,7 @@ void playMusic(const char* path)
 	char data_path[PATH_NAME_SIZE] = DATA_DIR;
 	strcat(data_path, path);
 
-	printf("Loading music [%s], Nick dancing in 3 2 1\n", data_path);
+	printf("Loading: %s\n", data_path);
 
 	if (g_musicStream != 0)
 	{
@@ -1902,13 +1902,15 @@ char* loadFile(const char *path, int *readed)
 	long size;
 	char* data;
 
-	printf("Loading [%s]\n", path);
+	printf("Loading: %s\n", path);
 	fd = fopen(path, "rb");
+
 	if(fd == NULL)
 	{
-		printf(">>> ERROR OPENING FILE [%s] <<< ... blame Heiko", path);
+		printf("Failed\n");
 		exit(1);
 	}
+
 	fseek(fd, 0, SEEK_END);
 	size = ftell(fd);
 	rewind(fd);
@@ -1948,7 +1950,7 @@ void loadTileProperties(mxml_node_t* tileset, mxml_node_t* tree)
 		else if (stricmp(name, "cratetarget") == 0)
 			g_world.crateTargetTex = id;
 		else
-			printf("Unknown property for tile %d named [%s], blame Tony\n", id, name);
+			printf("Unknown property for tile:%d name: %s\n", id, name);
 
 		mxmlDelete(property);
 		mxmlDelete(node);
