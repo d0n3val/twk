@@ -355,7 +355,8 @@ struct MapInfo
 #define MAX_MAPS 20
 
 struct MapInfo g_map_progression[MAX_MAPS];
-int g_current_map = 0;
+int g_current_map;
+int g_isMenuMap;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1055,6 +1056,8 @@ void gamePlay(float elapse, unsigned* stage)
 			else
 				loadMap(g_map_progression[g_current_map].file);
 
+			g_isMenuMap = !strcmp(g_map_progression[g_current_map].name, "Main Menu");
+
 			playMusic(g_map_progression[g_current_map].music);
 		}
 
@@ -1575,9 +1578,12 @@ render_floor:
 #if 1
 	// draw ui
 
+	const char* uiScreenName;
 	struct UllWidget* w;
 
-	if ((w = g_uiScreens) != NULL && (w = ullFindScreen(w, "in-game")) != NULL)
+	uiScreenName = g_isMenuMap ? "main-menu" : "in-game";
+
+	if ((w = g_uiScreens) != NULL && (w = ullFindScreen(w, uiScreenName)) != NULL)
 		while (w = ullNextWidget(w), w->type != 'X')
 		{
 			char *s = NULL, t[256], t2[64];
