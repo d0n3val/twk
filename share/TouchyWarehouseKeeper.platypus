@@ -55,7 +55,7 @@
 	<key>Role</key>
 	<string>Viewer</string>
 	<key>ScriptPath</key>
-	<string>share/run-twk-osx.sh</string>
+	<string>share/Kickstart.sh</string>
 	<key>Secure</key>
 	<false/>
 	<key>ShowInDock</key>
