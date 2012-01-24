@@ -12,15 +12,15 @@
 	<string>Malte Hildingsson</string>
 	<key>BundledFiles</key>
 	<array>
-		<string>/Users/mhildingsson/Develop/twk/data</string>
-		<string>/Users/mhildingsson/Develop/twk/twk.app</string>
-		<string>/Users/mhildingsson/Develop/twk/twk.app.dSYM</string>
-		<string>/Users/mhildingsson/Develop/twk/libbass.dylib</string>
+		<string>data</string>
+		<string>twk.app</string>
+		<string>twk.app.dSYM</string>
+		<string>libbass.dylib</string>
 	</array>
 	<key>Creator</key>
 	<string>Platypus-4.5</string>
 	<key>Destination</key>
-	<string>/Users/mhildingsson/Desktop/MyPlatypusApp.app</string>
+	<string>TouchyWarehouseKeeper.app</string>
 	<key>DestinationOverride</key>
 	<false/>
 	<key>DevelopmentVersion</key>
@@ -28,14 +28,14 @@
 	<key>Droppable</key>
 	<false/>
 	<key>ExecutablePath</key>
-	<string>/usr/local/share/platypus/ScriptExec</string>
+	<string>share/ScriptExec</string>
 	<key>FileTypes</key>
 	<array>
 		<string>****</string>
 		<string>fold</string>
 	</array>
 	<key>IconPath</key>
-	<string>/Applications/Platypus.app/Contents/Resources/PlatypusPlate.icns</string>
+	<string>share/PlatypusPlate.icns</string>
 	<key>Identifier</key>
 	<string>org.mhildingsson.TouchyWarehouseKeeper</string>
 	<key>Interpreter</key>
@@ -43,7 +43,7 @@
 	<key>Name</key>
 	<string>TouchyWarehouseKeeper</string>
 	<key>NibPath</key>
-	<string>/usr/local/share/platypus/MainMenu.nib</string>
+	<string>share/MainMenu.nib</string>
 	<key>OptimizeApplication</key>
 	<true/>
 	<key>Output</key>
@@ -55,7 +55,7 @@
 	<key>Role</key>
 	<string>Viewer</string>
 	<key>ScriptPath</key>
-	<string>/Users/mhildingsson/Develop/twk/run-twk-osx.sh</string>
+	<string>share/run-twk-osx.sh</string>
 	<key>Secure</key>
 	<false/>
 	<key>ShowInDock</key>
