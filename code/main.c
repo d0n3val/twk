@@ -370,6 +370,12 @@ int g_isMenuMap;
 #define TILE_TARGET ('*')
 #define TILE_UNKNOWN ('?')
 
+#define TARGET_TARGET (0)
+#define TARGET_NEWGAME (1)
+#define TARGET_CONTINUEGAME (2)
+#define TARGET_HISCORES (3)
+#define TARGET_OPTIONS (4)
+
 #define MAX_FLOORS 4
 #define MAX_RAMPS 2
 #define MAX_CRATES 32
@@ -384,6 +390,7 @@ struct Crate
 struct Target
 {
 	int x, y;
+	int type;
 };
 
 struct Ramp
@@ -995,6 +1002,20 @@ float posY(int y, int s) { return g_height * .5f - s * (g_world.ny * .5f) + y * 
 int unposX(float x, int s) { return (x + s *.5f - (g_width * .5f - s * (g_world.nx * .5f))) / s; }
 int unposY(float y, int s) { return (y + s *.5f - (g_height * .5f - s * (g_world.ny * .5f))) / s; }
 
+int checkMenuOptions()
+{
+	struct GamePlay* gp = &g_gamePlay;
+	int fid = gp->floorId;
+	struct Floor* f = &g_world.floors[fid];
+	struct Target* t;
+
+	for (int i = 0; i < f->ncrates; ++i)
+		if ((t = worldTargets(fid, f->crates[i].x, f->crates[i].y)) != NULL)
+			return t->type;
+
+	return -1;
+}
+
 int checkWinConditions()
 {
 	struct GamePlay* gp = &g_gamePlay;
@@ -1056,8 +1077,6 @@ void gamePlay(float elapse, unsigned* stage)
 			else
 				loadMap(g_map_progression[g_current_map].file);
 
-			g_isMenuMap = !strcmp(g_map_progression[g_current_map].name, "Main Menu");
-
 			playMusic(g_map_progression[g_current_map].music);
 		}
 
@@ -1077,30 +1096,47 @@ void gamePlay(float elapse, unsigned* stage)
 			loadGame();
 			playMusic(g_map_progression[g_current_map].music);
 		}
+
+		g_isMenuMap = !strcmp(g_map_progression[g_current_map].name, "Main Menu");
 	}
 
 	const int mx = unposX(g_mousex, ss);
 	const int my = unposY(g_mousey, ss);
+	int winConditions = 0;
 
-	int winConditions = gp->floorId != gp->targetFloor ? 0 : checkWinConditions();
+	if (g_isMenuMap) {
+		switch (checkMenuOptions()) {
+		case TARGET_NEWGAME:
+			g_current_map = 1;
+			memset(&g_gamePlay, 0, sizeof g_gamePlay);
+			break;
 
-	if (winConditions == 1) 
-	{
-		if (gp->finished == 0) 
-		{
-			playMusic("music/win.mp3");
-			gp->finished = 1;
+		case TARGET_CONTINUEGAME:
+			g_current_map = 1;
+			g_gameStart.loadGameOnStart = 1;
+			memset(&g_gamePlay, 0, sizeof g_gamePlay);
+			break;
 		}
+	}
+	else {
+		if (gp->floorId == gp->targetFloor)
+			winConditions = checkWinConditions();
 
-		if (buttonDown(0))
-		{
-			if (g_map_progression[++g_current_map].par < 0)
-				--(*stage);
-			else
-				*stage = ~0;
+		if (winConditions == 1) {
+			if (gp->finished == 0) {
+				playMusic("music/win.mp3");
+				gp->finished = 1;
+			}
+
+			if (buttonDown(0)) {
+				if (g_map_progression[++g_current_map].par < 0)
+					--(*stage);
+				else
+					*stage = ~0;
+			}
+
+			goto ignore_mouse_input;
 		}
-
-		goto ignore_mouse_input;
 	}
 
 	if ((gp->timer.elapse += elapse) >= 1.f)
@@ -1914,7 +1950,7 @@ char* loadFile(const char *path, int *readed)
 	if(fd == NULL)
 	{
 		printf("Failed\n");
-		exit(1);
+		return NULL;
 	}
 
 	fseek(fd, 0, SEEK_END);
@@ -1971,6 +2007,9 @@ void loadMap_tmx(const char* path)
 	char data_path[PATH_NAME_SIZE] = DATA_DIR;
 	char* data = loadFile(strcat(data_path, path), &n);
 
+	if (!data)
+		exit(1);
+
 	memset(&g_world, 0, sizeof(g_world));
 
 	mxml_node_t *tree = mxmlLoadString(NULL, data, MXML_TEXT_CALLBACK);
@@ -2008,8 +2047,11 @@ void loadMap_tmx(const char* path)
 		sprintf(data_path, "%s%s", DATA_DIR, src);
 
 		char* img = loadFile(data_path, &n);
-		createMapTex(tex_id, img, n, w, h);
-		free(img);
+
+		if (img) {
+			createMapTex(tex_id, img, n, w, h);
+			free(img);
+		}
 
 		g_world.Textures[g_world.ntextures].max_id = gid + sqr(num_subtextures);
 		g_world.Textures[g_world.ntextures].num_tiles = num_subtextures;
@@ -2064,8 +2106,7 @@ void loadMap_tmx(const char* path)
 
 	index2 = mxmlIndexNew(map, "objectgroup", NULL);
 
-	while((node2 = mxmlIndexEnum(index2)) != NULL)
-	{
+	while((node2 = mxmlIndexEnum(index2)) != NULL) {
 		const char* name = mxmlElementGetAttr(node2, "name");
 
 		char bare[32] = {0};
@@ -2078,43 +2119,62 @@ void loadMap_tmx(const char* path)
 
 		index3 = mxmlIndexNew(node2, "object", NULL);
 
-		while((node = mxmlIndexEnum(index3)) != NULL)
-		{
+		while((node = mxmlIndexEnum(index3)) != NULL) {
 			int x = atoi(mxmlElementGetAttr(node, "x")) / tilesize;
 			int y = atoi(mxmlElementGetAttr(node, "y")) / tilesize;
 			const char* type = mxmlElementGetAttr(node, "type");
 
-			if (stricmp(type, "start") == 0)
-			{
+			if (stricmp(type, "start") == 0) {
 				g_world.startx = x;
 				g_world.starty = y;
 				g_world.startFloor = fid;
 			}
-			else if (stricmp(type, "crate") == 0)
-			{
+			else if (stricmp(type, "crate") == 0) {
 				f->crates[f->ncrates].x = x;
 				f->crates[f->ncrates].y = y;
 				f->ncrates++;
 			}
-			else if (stricmp(type, "target") == 0)
-			{
+			else if (stricmp(type, "target") == 0) {
 				f->targets[f->ntargets].x = x;
 				f->targets[f->ntargets].y = y;
+				f->targets[f->ntargets].type = TARGET_TARGET;
 				f->ntargets++;
 			}
-			else if (stricmp(type, "ramp-up") == 0)
-			{
+			else if (stricmp(type, "ramp-up") == 0) {
 				f->ramps[f->nramps].x = x;
 				f->ramps[f->nramps].y = y;
 				f->ramps[f->nramps].dir = 1;
 				f->nramps++;
 			}
-			else if (stricmp(type, "ramp-down") == 0)
-			{
+			else if (stricmp(type, "ramp-down") == 0) {
 				f->ramps[f->nramps].x = x;
 				f->ramps[f->nramps].y = y;
 				f->ramps[f->nramps].dir = -1;
 				f->nramps++;
+			}
+			else if (stricmp(type, "newgame") == 0) {
+				f->targets[f->ntargets].x = x;
+				f->targets[f->ntargets].y = y;
+				f->targets[f->ntargets].type = TARGET_NEWGAME;
+				f->ntargets++;
+			}
+			else if (stricmp(type, "continuegame") == 0) {
+				f->targets[f->ntargets].x = x;
+				f->targets[f->ntargets].y = y;
+				f->targets[f->ntargets].type = TARGET_CONTINUEGAME;
+				f->ntargets++;
+			}
+			else if (stricmp(type, "hiscores") == 0) {
+				f->targets[f->ntargets].x = x;
+				f->targets[f->ntargets].y = y;
+				f->targets[f->ntargets].type = TARGET_HISCORES;
+				f->ntargets++;
+			}
+			else if (stricmp(type, "options") == 0) {
+				f->targets[f->ntargets].x = x;
+				f->targets[f->ntargets].y = y;
+				f->targets[f->ntargets].type = TARGET_OPTIONS;
+				f->ntargets++;
 			}
 
 			mxmlDelete(node);
@@ -2138,6 +2198,9 @@ void loadMap(const char* path)
 		int n = 0;
 		char data_path[PATH_NAME_SIZE] = DATA_DIR;
 		char* data = loadFile(strcat(data_path, path), &n);
+
+		if (!data)
+			exit(1);
 
 		memset(&g_world, 0, sizeof(g_world));
 
@@ -2235,6 +2298,9 @@ void loadConfig(const char* path)
 	char* data = loadFile(path, &n);
 	int map = -1; 
 
+	if (!data)
+		return;
+
 	for (int i = 0; i < n; ++i)
 		if (data[i] == '\n' || data[i] == '\r')
 			data[i] = 0;
@@ -2300,6 +2366,10 @@ void loadFont(const char* name, unsigned size)
 
 	int n;
 	unsigned char* data = (unsigned char*) loadFile(path, &n);
+
+	if (!data)
+		exit(1);
+
 	unsigned char* tmp = (unsigned char*) malloc(512 * 512);
 
 	stbtt_BakeFontBitmap(data, 0, (float) size, tmp, 512, 512, 32, 96, g_fontData);
@@ -2337,6 +2407,9 @@ void onFile(char* path)
 			return;
 
 		data = loadFile(path, &n);
+		if (!data)
+			exit(1);
+
 //		assert(n == w * h * 4);
 
 		glGenTextures(1, &g_tex[i]);
@@ -2367,6 +2440,9 @@ void onFile(char* path)
 
 		if (!strcmp(name, "playeranims")) {
 			data = loadFile(path, &n);
+
+			if (!data)
+				exit(1);
 
 			// parse tmx data
 
@@ -2432,6 +2508,9 @@ void onFile(char* path)
 
 			snprintf(fullpath, sizeof fullpath, "data/%s", pai->source);
 			data = loadFile(fullpath, &n);
+
+			if (!data)
+				exit(1);
 
 			unsigned char* image_data = stbi_load_from_memory(
 				(const unsigned char*) data, n, &sw, &sh, &m, 0);
