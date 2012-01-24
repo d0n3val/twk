@@ -607,9 +607,7 @@ void springUpdate(float attx, float atty, struct Spring* s, float elapse)
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-#define GAME_START (0)
-#define GAME_PLAY (1)
-#define GAME_OVER (2)
+#define GAME_PLAY (0)
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1671,9 +1669,7 @@ struct Stage
 	void (*func)(float, unsigned*);
 } g_stages[] =
 {
-	{&g_gameStart, sizeof(g_gameStart), &gameStart},
 	{&g_gamePlay, sizeof(g_gamePlay), &gamePlay},
-	{&g_gameOver, sizeof(g_gameOver), &gameOver}
 };
 
 void renderGame(float elapse)
