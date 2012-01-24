@@ -35,7 +35,7 @@
 		<string>fold</string>
 	</array>
 	<key>IconPath</key>
-	<string>share/PlatypusPlate.icns</string>
+	<string>share/twk.icns</string>
 	<key>Identifier</key>
 	<string>org.mhildingsson.TouchyWarehouseKeeper</string>
 	<key>Interpreter</key>
