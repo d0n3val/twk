@@ -312,10 +312,15 @@ void destroyMapTex()
 #define PLAYER_ANIM_TILE_PUSHLEFT (3)
 #define PLAYER_ANIM_TILE_PUSHDOWN (5)
 #define PLAYER_ANIM_TILE_PUSHUP (7)
+#define PLAYER_ANIM_TILE_WALKDOWNRIGHT (8)
+#define PLAYER_ANIM_TILE_WALKDOWNLEFT (9)
+#define PLAYER_ANIM_TILE_WALKUPRIGHT (10)
+#define PLAYER_ANIM_TILE_WALKUPLEFT (11)
 
 const char* g_playerAnimTileNames[] = {
 	"walkright", "pushright", "walkleft", "pushleft",
-	"walkdown", "pushdown", "walkup", "pushup"
+	"walkdown", "pushdown", "walkup", "pushup",
+	"walkdownright", "walkdownleft", "walkupright", "walkupleft"
 };
 
 struct PlayerAnimInfo {
@@ -858,7 +863,10 @@ struct Player
 	float time;
 	int x, y;
 	int ix, iy;
+	int fx, fy;
 	int path;
+	int turn;
+	float turntime;
 	int move;
 	float speed;
 #if _WIN32 || _MACOSX
@@ -1086,6 +1094,8 @@ void gamePlay(float elapse, unsigned* stage)
 
 		p->ix = p->x = g_world.startx;
 		p->iy = p->y = g_world.starty;
+		p->fx = 0;
+		p->fy = 1;
 		p->path = -1;
 		p->speed = 0.5f;
 
@@ -1285,6 +1295,7 @@ void gamePlay(float elapse, unsigned* stage)
 					float max_speed = 0.2f;
 					float min_dist = 3;
 					float max_dist = 18;
+
 					p->speed = max_speed;
 
 					if (p->path <= min_dist)
@@ -1348,13 +1359,15 @@ ignore_mouse_input:
 			{
 				p->ix = gp->path[p->path].x;
 				p->iy = gp->path[p->path].y;
+				p->turn = 1;
+				p->turntime = .08f;
 			}
 			else
 			{
 				p->ix = p->x - m->dx;
 				p->iy = p->y - m->dy;
 				p->move = 1;
-				p->speed = 0.55f;
+				p->speed = 0.33f;
 
 #if _WIN32 || _MACOSX
 				if (!g_mute)
@@ -1584,13 +1597,55 @@ render_floor:
 
 	if (dx || dy)
 	{
-		const float s = dx || dy ? clamp(p->time / p->speed, 0.f, 1.f) : 0.f;
+		const float s = (dx || dy) && !p->turn ? clamp(p->time / p->speed, 0.f, 1.f) : 0.f;
 		const int f = clamp((int) (s / .15f), 0, PLAYER_ANIM_FRAME_COUNT - 1);
-		const int t =
-			dx < 0.f ? PLAYER_ANIM_TILE_WALKLEFT + p->move :
-			dx > 0.f ? PLAYER_ANIM_TILE_WALKRIGHT + p->move :
-			dy < 0.f ? PLAYER_ANIM_TILE_WALKUP + p->move :
-			dy > 0.f ? PLAYER_ANIM_TILE_WALKDOWN + p->move : -1;
+		int t;
+
+		if (p->turn && (p->fx != dx || p->fy != dy)) {
+			if (p->fx > 0) {
+				t = dx < 0.f ? PLAYER_ANIM_TILE_WALKDOWN :
+					dy < 0.f ? PLAYER_ANIM_TILE_WALKUPRIGHT :
+					dy > 0.f ? PLAYER_ANIM_TILE_WALKDOWNRIGHT :
+					PLAYER_ANIM_TILE_PUSHDOWN;
+			}
+			else if (p->fx < 0) {
+				t = dx > 0.f ? PLAYER_ANIM_TILE_WALKUP :
+					dy < 0.f ? PLAYER_ANIM_TILE_WALKUPLEFT :
+					dy > 0.f ? PLAYER_ANIM_TILE_WALKDOWNLEFT :
+					PLAYER_ANIM_TILE_PUSHDOWN;
+			}
+			else if (p->fy > 0) {
+				t = dy < 0.f ? PLAYER_ANIM_TILE_WALKLEFT :
+					dx < 0.f ? PLAYER_ANIM_TILE_WALKDOWNLEFT :
+					dx > 0.f ? PLAYER_ANIM_TILE_WALKDOWNRIGHT :
+					PLAYER_ANIM_TILE_PUSHDOWN;
+			}
+			else if (p->fy < 0) {
+				t = dy > 0.f ? PLAYER_ANIM_TILE_WALKRIGHT :
+					dx < 0.f ? PLAYER_ANIM_TILE_WALKUPLEFT :
+					dx > 0.f ? PLAYER_ANIM_TILE_WALKUPRIGHT :
+					PLAYER_ANIM_TILE_PUSHDOWN;
+			}
+			else
+				t = PLAYER_ANIM_TILE_PUSHDOWN;
+
+			if ((p->turntime -= elapse) <= 0.f) {
+				p->turn = 0;
+				p->fx = dx;
+				p->fy = dy;
+			}
+		}
+		else {
+			t = dx < 0.f ? PLAYER_ANIM_TILE_WALKLEFT + p->move :
+				dx > 0.f ? PLAYER_ANIM_TILE_WALKRIGHT + p->move :
+				dy < 0.f ? PLAYER_ANIM_TILE_WALKUP + p->move :
+				dy > 0.f ? PLAYER_ANIM_TILE_WALKDOWN + p->move : -1;
+
+			p->turn = 0;
+			p->turntime = 0.f;
+			p->fx = dx;
+			p->fy = dy;
+		}
 
 		u0 = g_playerAnimTiles[t].frames[f].s0;
 		v0 = g_playerAnimTiles[t].frames[f].t0;
@@ -1606,6 +1661,11 @@ render_floor:
 		v0 = g_playerAnimTiles[t].frames[f].t0;
 		u1 = g_playerAnimTiles[t].frames[f].s1;
 		v1 = g_playerAnimTiles[t].frames[f].t1;
+
+		p->turn = 0;
+		p->turntime = 0.f;
+		p->fx = 0;
+		p->fy = 1;
 	}
 
 	sprite(posX(p->x, ss) + ix, posY(p->y, ss) + iy, ss, TEX_PLAYER, u0, v0, u1, v1);
