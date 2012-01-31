@@ -1,10 +1,5 @@
-# Compiles and creates a build .zip file
+#!/bin/sh
 
-mkdir twk
-cp *.dylib twk
-cp twk.app twk
-mkdir twk/data
-cp -r data/* twk/data
-rm -f twk/data/*.bin
-#zip -rm twk_%date:~-4%_%date:~3,2%_%date:~0,2%.zip twk
-zip -rm twk`date +%Y_%m_%d`-osx.zip twk
+./bin/platypus -P share/TouchyWarehouseKeeper.platypus TouchyWarehouseKeeper.app
+zip -rm twk`date +%Y_%m_%d`-osx.zip TouchyWarehouseKeeper.app
+
