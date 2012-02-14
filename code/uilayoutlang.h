@@ -97,10 +97,13 @@ static int ullCompile(char* s)
 				if (sscanf(t, "%dx%d%d%d %15s {%255[^\r\n]", &x, &y, &w, &h, align, text) != 6)
 					return fprintf(stderr, "Failed to parse label position and text\n"), -1;
 					
-				if ((t = strtok(NULL, ws)) != NULL && strcmp(t, "end")) {
-					if (!strncmp(t, "->", 6) && (cmd = strtok(NULL, ws)) == NULL)
-						return fprintf(stderr, "Expected action text\n"), -1;
-				}
+				if ((t = strtok(NULL, ws)) != NULL && strcmp(t, "end"))
+					if (!strncmp(t, "->", 2)) {
+						if ((cmd = strtok(NULL, ws)) == NULL)
+							return fprintf(stderr, "Expected action text\n"), -1;
+
+						t = strtok(NULL, ws);
+					}
 					
 				*p++ = (!!cmd)["LB"];
 				*p++ = (char) x, *p++ = (char) y;

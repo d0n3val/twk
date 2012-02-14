@@ -510,6 +510,7 @@ int isTargetTile(int fid, int x, int y)
 
 void gprintf(float x, float y, unsigned c, const char* fmt, ...);
 void quad(float x, float y, float s, unsigned c);
+void rect(float x, float y, float w, float h, unsigned c);
 void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1);
 
 void drawUi(const char* name);
@@ -914,6 +915,7 @@ struct GamePlay
 	struct PathNode path[128];
 	int stepSaved;
 	struct UndoStep steps[64];
+	int cmd;
 } g_gamePlay;
 
 int pathFind(int startx, int starty, int goalx, int goaly)
@@ -1165,21 +1167,19 @@ void gamePlay(float elapse, unsigned* stage)
 
 	gp->intro = min(gp->intro + 16.f * elapse, M_PI * 4.5f);
 
-	if (keyDown('p'))
-	{
+	if (gp->cmd == 'p') {
+		gp->cmd = 0;
 		saveGame();
 		--(*stage);
-	}
-	else if (keyDown('r'))
-	{
+	} else if (gp->cmd == 'r') {
+		gp->cmd = 0;
 		*stage = ~0;
-	}
-	else if (keyDown('u') && (gp->moves > 0 || p->path >= 0 || p->move))
-	{
+	} else if (gp->cmd == 'u' && (gp->moves > 0 || p->path >= 0 || p->move)) {
+		gp->cmd = 0;
+
 		if (p->path < 0 && p->move == 0)
 			--gp->moves;
-		else
-		{
+		else {
 			p->move = 0;
 			p->path = -1;
 			m->x0 = -1;
@@ -1680,22 +1680,40 @@ render_floor:
 	uiScreenName = g_isMenuMap ? "main-menu" : "in-game";
 
 	if ((w = g_uiScreens) != NULL && (w = ullFindScreen(w, uiScreenName)) != NULL)
-		while (w = ullNextWidget(w), w->type != 'X')
-		{
+		while (w = ullNextWidget(w), w->type != 'X') {
 			char *s = NULL, t[256], t2[64];
 			*t = 0;
 
 			while ((s = ullFormat(t, ullText(w), s)) != NULL)
-					if (strnicmp(s, "level", 5) == 0)
-						s = g_map_progression[g_current_map].name;
-					else if (strnicmp(s, "time", 5) == 0)
-						sprintf(s = t2, "%02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
-					else if (strnicmp(s, "moves", 5) == 0)
-						sprintf(s = t2, "%d", gp->moves);
-					else if (strnicmp(s, "par", 5) == 0)
-						sprintf(s = t2, "%d", g_map_progression[g_current_map].par);
+				if (strnicmp(s, "level", 5) == 0)
+					s = g_map_progression[g_current_map].name;
+				else if (strnicmp(s, "time", 5) == 0)
+					sprintf(s = t2, "%02d:%02d:%02d", gp->timer.hours, gp->timer.minutes, gp->timer.seconds);
+				else if (strnicmp(s, "moves", 5) == 0)
+					sprintf(s = t2, "%d", gp->moves);
+				else if (strnicmp(s, "par", 5) == 0)
+					sprintf(s = t2, "%d", g_map_progression[g_current_map].par);
 
-			gprintf(ullX(w) / 100.f, ullY(w) / 100.f, ~0, t);
+			if (w->type == 'B') {
+				float x = g_width * (ullX(w) / 100.f);
+				float y = g_height * (ullY(w) / 100.f);
+				float ww = g_width * (ullWidth(w) / 100.f) - 1.f;
+				float hh = g_height * (ullHeight(w) / 100.f) - 1.f;
+				rect(x, y, ww, hh, 0x007f7f7f);
+
+				if (buttonDown(0) &&
+						g_mousex >= x && g_mousex < (x + ww) &&
+						g_mousey >= y && g_mousey < (y + hh)) {
+					if (!strcmp(ullCmd(w), "undo"))
+						gp->cmd = 'u';
+					else if (!strcmp(ullCmd(w), "pause"))
+						gp->cmd = 'p';
+					else if (!strcmp(ullCmd(w), "restart"))
+						gp->cmd = 'r';
+				}
+			}
+
+			gprintf(ullX(w) / 100.f + 2.f / g_width, ullY(w) / 100.f + 20.f / g_height, ~0, t);
 		}
 #else
 	gprintf(.02f, .05f, 0x00ffffff, "LEVEL: %s", g_map_progression[g_current_map].name);
@@ -1832,6 +1850,21 @@ void quad(float x, float y, float s, unsigned c)
 	glEnd();
 
 	glPopMatrix();
+}
+
+void rect(float x, float y, float w, float h, unsigned c)
+{
+	glColor4ubv((unsigned char*) &c);
+
+	glBegin(GL_QUADS);
+		glVertex2f(x, y);
+		glVertex2f(x, y + h);
+		glVertex2f(x + w, y + h);
+		glVertex2f(x + w, y);
+	glEnd();
+
+	c = ~0;
+	glColor4ubv((unsigned char*) &c);
 }
 
 void sprite(float x, float y, float s, unsigned texId, float u0, float v0, float u1, float v1)

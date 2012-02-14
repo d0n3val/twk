@@ -7,5 +7,9 @@ scene in-game
 	label 3x75+0+0 center {Level: $level}
 	label 3x85+0+0 center {Time: $time}
 	label 3x65+0+50 right {Moves: $moves Par: $par}
+
+	button 50x75+10+4 center {UNDO} -> undo
+	button 50x80+10+4 center {PAUSE} -> pause
+	button 50x85+10+4 center {RESTART} -> restart
 end
 
