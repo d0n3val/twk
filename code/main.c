@@ -2159,7 +2159,7 @@ void loadMap_tmx(const char* path)
 	mxmlIndexDelete(index);
 
 	// Objects loading ---
-	// Only supports one ¨objectgroup¨. Inside it only 3 types of objects are valid:
+	// Only supports one Â¨objectgroupÂ¨. Inside it only 3 types of objects are valid:
 	// - start: position were the player starts
 	// - crate: a crate will be created in that position
 	// - target: all targets need to have a crate in order to finish a level
@@ -2685,3 +2685,4 @@ int main(int argc, char* argv[])
 	glutMainLoop();
 	return 0;
 }
+
