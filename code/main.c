@@ -1291,8 +1291,8 @@ void gamePlay(float elapse, unsigned* stage)
 					p->ix = gp->path[p->path].x;
 					p->iy = gp->path[p->path].y;
 
-					float min_speed = 0.4f;
-					float max_speed = 0.2f;
+					float min_speed = 0.33f;
+					float max_speed = 0.25f;
 					float min_dist = 3;
 					float max_dist = 18;
 
@@ -1344,7 +1344,7 @@ void gamePlay(float elapse, unsigned* stage)
 ignore_mouse_input:
 	;
 
-	if (p->path < 0 && !p->move)
+	if ((p->path < 0 && !p->move) || p->turn)
 		;
 	else if ((p->time += elapse) >= p->speed)
 	{
@@ -1360,14 +1360,14 @@ ignore_mouse_input:
 				p->ix = gp->path[p->path].x;
 				p->iy = gp->path[p->path].y;
 				p->turn = 1;
-				p->turntime = .16f;
+				p->turntime = .04f;
 			}
 			else
 			{
 				p->ix = p->x - m->dx;
 				p->iy = p->y - m->dy;
 				p->move = 1;
-				p->speed = 0.33f;
+				p->speed = 0.5f;
 
 #if _WIN32 || _MACOSX
 				if (!g_mute)
@@ -2658,6 +2658,9 @@ void init(int* argc, char* argv[])
 		loadFont(fontName, fontSize);
 
 	g_textEnd = g_textBuffer;
+
+	// Change to iphone reso by default
+	ChangeRes(960, 640, "Iphone 4");
 }
 
 void end()
