@@ -6,7 +6,6 @@ end
 scene in-game
 	label 3x75+0+0 center {Level: $level}
 	label 3x85+0+0 center {Time: $time}
-	label 3x5+0+0 center {Moves: $moves Par: $par}
-	label 3x95+700+0 center {[U]ndo   [P]ause   [R]estart}
+	label 3x65+0+50 right {Moves: $moves Par: $par}
 end
 

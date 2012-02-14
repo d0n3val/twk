@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.0" orientation="orthogonal" width="4" height="4" tilewidth="32" tileheight="32">
  <tileset firstgid="1" name="warp" tilewidth="32" tileheight="32">
-  <image source="textures/warp.png" width="128" height="128"/>
+  <image source="sprites/warp.png" width="128" height="128"/>
   <tile id="0">
    <properties>
     <property name="warp" value="1"/>
