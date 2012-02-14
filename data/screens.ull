@@ -4,8 +4,8 @@ scene main-menu
 end
 
 scene in-game
-	label 3x75+0+0 center {Level: $level}
-	label 3x85+0+0 center {Time: $time}
-	label 3x65+0+50 right {Moves: $moves Par: $par}
+	label 45x98+0+0 center {Level: $level}
+	label 30x98+0+0 center {$time}
+	label 3x98+0+50 center {Moves: $moves     Par: $par}
 end
 
