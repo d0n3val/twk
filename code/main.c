@@ -1360,7 +1360,7 @@ ignore_mouse_input:
 				p->ix = gp->path[p->path].x;
 				p->iy = gp->path[p->path].y;
 				p->turn = 1;
-				p->turntime = .08f;
+				p->turntime = .16f;
 			}
 			else
 			{
