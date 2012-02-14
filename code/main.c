@@ -1344,7 +1344,7 @@ void gamePlay(float elapse, unsigned* stage)
 ignore_mouse_input:
 	;
 
-	if (p->path < 0 && !p->move)
+	if ((p->path < 0 && !p->move) || p->turn)
 		;
 	else if ((p->time += elapse) >= p->speed)
 	{
@@ -1360,7 +1360,7 @@ ignore_mouse_input:
 				p->ix = gp->path[p->path].x;
 				p->iy = gp->path[p->path].y;
 				p->turn = 1;
-				p->turntime = .16f;
+				p->turntime = .04f;
 			}
 			else
 			{
